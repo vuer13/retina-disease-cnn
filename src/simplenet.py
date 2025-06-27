@@ -23,25 +23,26 @@ class SimpleNet:
         model.add(Dropout(0.25))
         
         model.add(Conv2D(128, (5, 5), padding="same", kernel_regularizer=reg))
-		model.add(Activation("relu"))
-		model.add(MaxPooling2D(pool_size=(2, 2)))
-		model.add(Dropout(0.25))
+        model.add(Activation("relu"))
+        model.add(MaxPooling2D(pool_size=(2, 2)))
+        model.add(Dropout(0.25))
   
         model.add(Conv2D(256, (3, 3), padding="same", kernel_regularizer=reg))
-		model.add(Activation("relu"))
-		model.add(MaxPooling2D(pool_size=(2, 2)))
-		model.add(Dropout(0.25))
+        model.add(Activation("relu"))
+        model.add(MaxPooling2D(pool_size=(2, 2)))
+        model.add(Dropout(0.25))
   
         # FC => RELU Layer
         model.add(Flatten())
-		model.add(Dense(512, kernel_regularizer=reg))
-		model.add(Activation("relu"))
-		model.add(Dropout(0.5))
+        model.add(Dense(512, kernel_regularizer=reg))
+        model.add(Activation("relu"))
+        model.add(Dropout(0.5))
   
-        model.add(Dense(classes))
         if classes == 1:
+            model.add(Dense(1))
             model.add(Activation('sigmoid')) 
         else:
+            model.add(Dense(classes))
             model.add(Activation('softmax'))
         
         return model
