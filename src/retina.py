@@ -43,15 +43,17 @@ class RetinaGenerator(Sequence):
         for _, row in df.iterrows():
             img_path = os.path.join(self.img_dir, str(row["ID"]) + '.png')
             image = load_img(img_path, target_size = self.image_size)
-            image = img_to_array(image)
+            image = img_to_array(image).astype(np.float32)
+            
+            image = image / 255.0
             
             if self.augmenter:
                 image = self.augmenter.random_transform(image.astype(np.uint8))
-            
-            label = row[self.label_cols].values.astype(np.float32)
-            
+                        
             if self.mode == 'binary':
-                label = label[0]
+                label = float(row['Disease_Risk'])
+            else:
+                label = row[self.label_cols].values.astype(np.float32)
                 
             images.append(image)
             labels.append(label)
