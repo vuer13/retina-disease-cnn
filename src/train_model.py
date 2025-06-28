@@ -44,6 +44,15 @@ totalTrain = len(pd.read_csv(config.DATASET_PATH_TRAIN + '/RFMiD_Training_Labels
 totalVal = len(pd.read_csv(config.DATASET_PATH_VAL + '/RFMiD_Validation_Labels.csv'))
 totalTest = len(pd.read_csv(config.DATASET_PATH_TEST + '/RFMiD_Testing_Labels.csv'))
 
+datasets = {config.DATASET_PATH_TRAIN + '/RFMiD_Training_Labels.csv' : config.DATASET_PATH_TRAIN + '/RFMiD_Training_Labels_new.csv', 
+            config.DATASET_PATH_VAL + '/RFMiD_Validation_Labels.csv' : config.DATASET_PATH_VAL + '/RFMiD_Validation_Labels_new.csv',
+            config.DATASET_PATH_TEST + '/RFMiD_Testing_Labels.csv' : config.DATASET_PATH_TEST + '/RFMiD_Testing_Labels_new.csv'}
+
+for data, new in datasets.items():
+    df = pd.read_csv(data)
+    df = df.sample(frac = 1, random_state = 42).reset_index(drop=True)
+    df.to_csv(new)
+
 trainAug = ImageDataGenerator(
 	rescale=1 / 255.0,
 	rotation_range=30,
@@ -61,7 +70,7 @@ print("checkpoint1")
 valAug = ImageDataGenerator(rescale=1 / 255.0)
 
 trainingGen = RetinaGenerator(
-    csv_path = config.DATASET_PATH_TRAIN + '/RFMiD_Training_Labels.csv',
+    csv_path = config.DATASET_PATH_TRAIN + '/RFMiD_Training_Labels_new.csv',
     img_dir = config.DATASET_PATH_TRAIN + '/Training',
     mode = 'binary',
     augmenter = trainAug,
@@ -71,7 +80,7 @@ trainingGen = RetinaGenerator(
 )
 
 valGen = RetinaGenerator(
-    csv_path = config.DATASET_PATH_VAL + '/RFMiD_Validation_Labels.csv',
+    csv_path = config.DATASET_PATH_VAL + '/RFMiD_Validation_Labels_new.csv',
     img_dir = config.DATASET_PATH_VAL + '/Validation',
     mode = 'binary',
     augmenter = valAug,
@@ -81,14 +90,14 @@ valGen = RetinaGenerator(
 )
 
 testGen = RetinaGenerator(
-    csv_path = config.DATASET_PATH_TEST + '/RFMiD_Testing_Labels.csv',
+    csv_path = config.DATASET_PATH_TEST + '/RFMiD_Testing_Labels_new.csv',
     img_dir = config.DATASET_PATH_TEST + '/Test',
     mode = 'binary',
     augmenter = valAug,
     batch_size = batch_size,
     image_size = (224, 224),
     shuffle = False
-)
+) 
 
 print("checkpoint2")
 
@@ -103,21 +112,20 @@ def focal_loss(gamma=2.0, alpha=0.2):
     
     return loss_fn
 
-model = SimpleNet.build(224, 224, 3, classes=1, reg=l2(0.00005))
+model = SimpleNet.build(224, 224, 3, classes=1, reg=l2(0.0001))
 opt = SGD(learning_rate=lr, momentum=0.9)
-model.compile(loss=focal_loss(gamma=2.0, alpha=0.20), optimizer=opt, metrics=['accuracy', Recall(), AUC()])
+model.compile(loss=focal_loss(2.0, 0.2), optimizer=opt, metrics=['accuracy', Recall(), AUC()])
 
 early_stop = EarlyStopping(
     monitor='val_loss',
-    patience=5,
-    restore_best_weights=True,
-    verbose=1
+    patience=4,
+    restore_best_weights=True
 )
 
 callbacks =[LearningRateScheduler(poly_decay), early_stop]
-#callbacks = [ReduceLROnPlateau(monitor='val_loss', factor = 0.5, patience=3, min_lr=1e-7)]
+#callbacks = [ReduceLROnPlateau(monitor='val_loss', factor = 0.5, patience=3, min_lr=1e-7), early_stop]
 
-train_labels = pd.read_csv(config.DATASET_PATH_TRAIN + '/RFMiD_Training_Labels.csv')["Disease_Risk"]
+train_labels = pd.read_csv(config.DATASET_PATH_TRAIN + '/RFMiD_Training_Labels_new.csv')["Disease_Risk"]
 print(train_labels.value_counts(normalize=True))
 
 class_weights = compute_class_weight(
