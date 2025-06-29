@@ -8,7 +8,7 @@ from tensorflow.keras.preprocessing.image import load_img, img_to_array
 class RetinaGenerator(Sequence):
     def __init__(self, csv_path, img_dir, mode='binary', augmenter=None, batch_size=32, image_size=(224, 224), shuffle=True):        
         self.df = pd.read_csv(csv_path)
-        self.df = self.df[self.df['Disease_Risk'].isin([0, 1])]
+        self.df = self.df[self.df['Disease_Risk'].isin([0, 1])]        
         self.img_dir = img_dir
         self.batch_size = batch_size
         self.image_size = image_size
@@ -43,9 +43,9 @@ class RetinaGenerator(Sequence):
         for _, row in df.iterrows():
             img_path = os.path.join(self.img_dir, str(row["ID"]) + '.png')
             image = load_img(img_path, target_size = self.image_size)
-            image = img_to_array(image).astype(np.float32)
+            image = img_to_array(image)
             
-            image = image / 255.0
+            image = (image / 127.5) - 1.0
             
             if self.augmenter:
                 image = self.augmenter.random_transform(image.astype(np.uint8))
@@ -55,9 +55,11 @@ class RetinaGenerator(Sequence):
             else:
                 label = row[self.label_cols].values.astype(np.float32)
                 
+            if np.random.rand() > 0.7:
+                channel = np.random.randint(0, 3)
+                image[..., channel] = 0
+                
             images.append(image)
             labels.append(label)
             
         return np.array(images, dtype=np.float32), np.array(labels, dtype=np.float32)
-            
-        

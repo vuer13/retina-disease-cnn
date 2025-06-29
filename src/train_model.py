@@ -4,6 +4,7 @@ matplotlib.use('Agg')
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from tensorflow.keras.callbacks import LearningRateScheduler, ReduceLROnPlateau
 from tensorflow.keras.callbacks import EarlyStopping
+from tensorflow.keras.callbacks import CSVLogger, ModelCheckpoint
 from tensorflow.keras.optimizers import SGD, Adam
 from tensorflow.keras.regularizers import l2
 from tensorflow.keras.metrics import Recall, AUC
@@ -29,7 +30,7 @@ args = vars(ap.parse_args())
 
 epoch = 50
 lr = 1e-4
-batch_size = 16
+batch_size = 32
 maxEpoch = epoch
 
 def poly_decay(epoch):
@@ -54,8 +55,8 @@ for data, new in datasets.items():
     df.to_csv(new)
 
 trainAug = ImageDataGenerator(
-	rescale=1 / 255.0,
-	rotation_range=30,
+	rescale=1/127.5 - 1.0,
+	rotation_range=40,
 	zoom_range=0.05,
 	width_shift_range=0.05,
 	height_shift_range=0.05,
@@ -67,7 +68,7 @@ trainAug = ImageDataGenerator(
 
 print("checkpoint1")
 
-valAug = ImageDataGenerator(rescale=1 / 255.0)
+valAug = ImageDataGenerator(rescale=1/127.5 - 1.0)
 
 trainingGen = RetinaGenerator(
     csv_path = config.DATASET_PATH_TRAIN + '/RFMiD_Training_Labels_new.csv',
@@ -101,7 +102,7 @@ testGen = RetinaGenerator(
 
 print("checkpoint2")
 
-def focal_loss(gamma=2.0, alpha=0.2):
+def focal_loss(gamma=2.0, alpha=0.75):
     def loss_fn(y_true, y_pred):
         epsilon = tf.keras.backend.epsilon()
         y_pred = tf.clip_by_value(y_pred, epsilon, 1. - epsilon)
@@ -112,18 +113,28 @@ def focal_loss(gamma=2.0, alpha=0.2):
     
     return loss_fn
 
+X, y = next(iter(valGen))
+print("[VAL SANITY CHECK]", np.unique(y, return_counts=True))
+
 model = SimpleNet.build(224, 224, 3, classes=1, reg=l2(0.0001))
-opt = SGD(learning_rate=lr, momentum=0.9)
-model.compile(loss=focal_loss(2.0, 0.2), optimizer=opt, metrics=['accuracy', Recall(), AUC()])
+opt = Adam(learning_rate=lr)
+model.compile(loss='binary_crossentropy', optimizer=opt, metrics=['accuracy', Recall(), AUC()])
 
 early_stop = EarlyStopping(
     monitor='val_loss',
-    patience=4,
+    mode='max',
+    patience=5,
+    min_delta=0.001,
     restore_best_weights=True
 )
 
-callbacks =[LearningRateScheduler(poly_decay), early_stop]
-#callbacks = [ReduceLROnPlateau(monitor='val_loss', factor = 0.5, patience=3, min_lr=1e-7), early_stop]
+#callbacks =[LearningRateScheduler(poly_decay), early_stop]
+callbacks = [ReduceLROnPlateau(monitor='val_loss', factor = 0.5, patience=3, min_lr=1e-6, mode='max'), 
+             early_stop,
+             CSVLogger('training.log'),
+             ModelCheckpoint('../model/best_model.h5',
+                            save_best_only=True,
+                            save_weights=False)]
 
 train_labels = pd.read_csv(config.DATASET_PATH_TRAIN + '/RFMiD_Training_Labels_new.csv')["Disease_Risk"]
 print(train_labels.value_counts(normalize=True))
@@ -133,7 +144,8 @@ class_weights = compute_class_weight(
     classes=np.unique(train_labels),
     y=train_labels
 )
-class_weight_dict = dict(zip(np.unique(train_labels), class_weights))
+#class_weight_dict = dict(zip(np.unique(train_labels), class_weights))
+class_weight_dict = {0: 3.0, 1: 0.7}
 print(class_weight_dict)
 
 H = model.fit(
@@ -149,9 +161,9 @@ H = model.fit(
 print("checkpoint3")
 
 predId = model.predict(x=testGen, steps=(totalTest // batch_size) + 1)
-predId = (predId > 0.5).astype("int32")
+predId = (predId > 0.3).astype("int32")
 
-test_df = pd.read_csv(config.TEST_CSV)
+test_df = pd.read_csv(config.DATASET_PATH_TEST + '/RFMiD_Testing_Labels_new.csv')
 y_true = test_df["Disease_Risk"].astype("int32").values
 print(np.unique(y_true))
 
@@ -159,7 +171,7 @@ print(classification_report(y_true[:len(predId)], predId))
 print(confusion_matrix(y_true[:len(predId)], predId))
 model.save("../model/retina_model.h5")
 
-N = epoch
+N = len(H.history["loss"])
 plt.style.use("ggplot")
 plt.figure()
 plt.plot(np.arange(0, N), H.history["loss"], label="train_loss")
