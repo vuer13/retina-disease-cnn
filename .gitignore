@@ -6,3 +6,7 @@ duplicate_pair_1.png
 duplicate_pair_2.png
 Train_batch_check.png
 Val_batch_check.png
+
+clean_validation/
+duplicates_removed/
+quarantine_duplicates/

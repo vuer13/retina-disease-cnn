@@ -22,6 +22,12 @@ import argparse
 from retina import RetinaGenerator
 from simplenet import SimpleNet
 import config
+import tqdm as tqdm
+
+from PIL import Image, ImageFilter, ImageOps
+import shutil
+import imagehash
+import os
 
 ap = argparse.ArgumentParser()
 ap.add_argument("-p", "--plot", type=str, default="plot.png",
@@ -57,22 +63,101 @@ for data, new in datasets.items():
 print("checkpoint1")
 
 trainAug = ImageDataGenerator(
-	#rotation_range=20,
-	#zoom_range=0.03,
-	#width_shift_range=0.03,
-	#height_shift_range=0.05,
-	#shear_range=0.05,
-	horizontal_flip=True,
-	fill_mode="constant"
+	rotation_range=15,
+    zoom_range=0.1,
+    width_shift_range=0.1,
+    height_shift_range=0.1,
+    shear_range=0.05,
+    horizontal_flip=True,
+    vertical_flip=True,  
+    brightness_range=[0.9, 1.1],
+    channel_shift_range=20.0,
+    fill_mode="reflect"
 )
 
 valAug = ImageDataGenerator()
 
 testAug = ImageDataGenerator()
 
+
+
+train_csv = os.path.join(config.DATASET_PATH_TRAIN, 'RFMiD_Training_Labels_new.csv')
+val_csv = os.path.join(config.DATASET_PATH_VAL, 'RFMiD_Validation_Labels_new.csv')
+test_csv = os.path.join(config.DATASET_PATH_TEST, 'RFMiD_Testing_Labels_new.csv')
+
+train_dir = os.path.join(config.DATASET_PATH_TRAIN, 'Training')
+val_dir = os.path.join(config.DATASET_PATH_VAL, 'Validation')
+test_dir = os.path.join(config.DATASET_PATH_TEST, 'Test')
+
+def get_robust_hash(img_path, hash_size=8):
+    try:
+        img = Image.open(img_path).resize((256, 256))
+        img = img.filter(ImageFilter.GaussianBlur(radius=0.5))
+        return imagehash.phash(img, hash_size=hash_size)
+    except Exception as e:
+        print(f"Skipping {img_path}: {str(e)}")
+        return None
+
+
+#DOUBLE CHECK HERE
+VAL_CSV_PATH = '../data/Evaluation_Set/Evaluation_Set/RFMiD_Validation_Labels_new.csv'
+VAL_IMG_DIR = '../data/Evaluation_Set/Evaluation_Set/Validation'
+TRAIN_IMG_DIR = '../data/Training_Set/Training_Set/Training'
+
+val_df = pd.read_csv(VAL_CSV_PATH)
+
+os.makedirs('./clean_validation/images', exist_ok=True)
+clean_csv_path = './clean_validation/validation_clean.csv'
+
+train_hashes = {}
+for train_img in os.listdir(TRAIN_IMG_DIR):
+    if train_img.endswith('.png'):
+        train_path = os.path.join(TRAIN_IMG_DIR, train_img)
+        try:
+            train_hashes[train_img] = imagehash.phash(Image.open(train_path))
+        except:
+            continue
+
+valid_samples = []
+duplicates_removed = 0
+missing_removed = 0
+
+print("Processing validation set...")
+for idx, row in val_df.iterrows():
+    img_id = row['ID']
+    img_path = os.path.join(VAL_IMG_DIR, f"{img_id}.png")
+    img_file = f"{img_id}.png"
+    
+    if not os.path.exists(img_path):
+        missing_removed += 1
+        continue
+        
+    try:
+        val_hash = imagehash.phash(Image.open(img_path))
+        is_duplicate = any(val_hash == train_hash for train_hash in train_hashes.values())
+        
+        if not is_duplicate:
+            shutil.copy(img_path, f'./clean_validation/images/{img_id}.png')
+            valid_samples.append(row)
+        else:
+            duplicates_removed += 1
+    except:
+        continue
+
+clean_df = pd.DataFrame(valid_samples)
+clean_df.to_csv(clean_csv_path, index=False)
+
+print("\n=== RESULTS ===")
+print(f"Removed duplicates: {duplicates_removed}")
+print(f"Removed missing files: {missing_removed}")
+print(f"Final clean samples: {len(clean_df)}")
+
+    
+
+    
 trainingGen = RetinaGenerator(
-    csv_path = config.DATASET_PATH_TRAIN + '/RFMiD_Training_Labels_new.csv',
-    img_dir = config.DATASET_PATH_TRAIN + '/Training',
+    csv_path = train_csv,
+    img_dir = train_dir,
     mode = 'binary',
     augmenter = trainAug,
     batch_size = batch_size,
@@ -81,8 +166,8 @@ trainingGen = RetinaGenerator(
 )
 
 valGen = RetinaGenerator(
-    csv_path = config.DATASET_PATH_VAL + '/RFMiD_Validation_Labels_new.csv',
-    img_dir = config.DATASET_PATH_VAL + '/Validation',
+    csv_path = clean_csv_path,
+    img_dir = './clean_validation/images',
     mode = 'binary',
     augmenter = valAug,
     batch_size = batch_size,
@@ -91,8 +176,8 @@ valGen = RetinaGenerator(
 )
 
 testGen = RetinaGenerator(
-    csv_path = config.DATASET_PATH_TEST + '/RFMiD_Testing_Labels_new.csv',
-    img_dir = config.DATASET_PATH_TEST + '/Test',
+    csv_path = test_csv,
+    img_dir = test_dir,
     mode = 'binary',
     augmenter = testAug,
     batch_size = batch_size,
@@ -118,7 +203,7 @@ print("[VAL SANITY CHECK]", np.unique(y, return_counts=True))
 
 model = SimpleNet.build(224, 224, 3, classes=1, reg=l2(0.0001))
 opt = Adam(learning_rate=lr)
-model.compile(loss='binary_crossentropy', optimizer=opt, metrics=['accuracy', Recall(), AUC()])
+model.compile(loss=focal_loss(), optimizer=opt, metrics=['accuracy', Recall(), AUC()])
 
 early_stop = EarlyStopping(
     monitor='val_auc',
