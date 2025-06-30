@@ -29,7 +29,7 @@ ap.add_argument("-p", "--plot", type=str, default="plot.png",
 args = vars(ap.parse_args())
 
 epoch = 50
-lr = 1e-4
+lr = 5e-5
 batch_size = 32
 maxEpoch = epoch
 
@@ -53,22 +53,22 @@ for data, new in datasets.items():
     df = pd.read_csv(data)
     df = df.sample(frac = 1, random_state = 42).reset_index(drop=True)
     df.to_csv(new)
-
-trainAug = ImageDataGenerator(
-	rescale=1/127.5 - 1.0,
-	rotation_range=40,
-	zoom_range=0.05,
-	width_shift_range=0.05,
-	height_shift_range=0.05,
-	shear_range=0.05,
-	horizontal_flip=True,
-    brightness_range=[0.8, 1.2],
-	fill_mode="nearest"
-)
-
+    
 print("checkpoint1")
 
-valAug = ImageDataGenerator(rescale=1/127.5 - 1.0)
+trainAug = ImageDataGenerator(
+	#rotation_range=20,
+	#zoom_range=0.03,
+	#width_shift_range=0.03,
+	#height_shift_range=0.05,
+	#shear_range=0.05,
+	horizontal_flip=True,
+	fill_mode="constant"
+)
+
+valAug = ImageDataGenerator()
+
+testAug = ImageDataGenerator()
 
 trainingGen = RetinaGenerator(
     csv_path = config.DATASET_PATH_TRAIN + '/RFMiD_Training_Labels_new.csv',
@@ -94,7 +94,7 @@ testGen = RetinaGenerator(
     csv_path = config.DATASET_PATH_TEST + '/RFMiD_Testing_Labels_new.csv',
     img_dir = config.DATASET_PATH_TEST + '/Test',
     mode = 'binary',
-    augmenter = valAug,
+    augmenter = testAug,
     batch_size = batch_size,
     image_size = (224, 224),
     shuffle = False
@@ -121,20 +121,25 @@ opt = Adam(learning_rate=lr)
 model.compile(loss='binary_crossentropy', optimizer=opt, metrics=['accuracy', Recall(), AUC()])
 
 early_stop = EarlyStopping(
-    monitor='val_loss',
+    monitor='val_auc',
     mode='max',
-    patience=5,
-    min_delta=0.001,
-    restore_best_weights=True
+    patience=10,
+    min_delta=0.01,
+    baseline=0.6,
+    restore_best_weights=True,
+    verbose=1
 )
 
 #callbacks =[LearningRateScheduler(poly_decay), early_stop]
-callbacks = [ReduceLROnPlateau(monitor='val_loss', factor = 0.5, patience=3, min_lr=1e-6, mode='max'), 
+callbacks = [ReduceLROnPlateau(monitor='val_auc', mode='max', factor = 0.45, patience=3, min_lr=1e-6, verbose=1, min_delta=0.005), 
              early_stop,
              CSVLogger('training.log'),
              ModelCheckpoint('../model/best_model.h5',
                             save_best_only=True,
-                            save_weights=False)]
+                            save_weights=False,
+                            monitor='val_auc',
+                            mode='max',
+                            verbose=1)]
 
 train_labels = pd.read_csv(config.DATASET_PATH_TRAIN + '/RFMiD_Training_Labels_new.csv')["Disease_Risk"]
 print(train_labels.value_counts(normalize=True))
@@ -144,8 +149,8 @@ class_weights = compute_class_weight(
     classes=np.unique(train_labels),
     y=train_labels
 )
-#class_weight_dict = dict(zip(np.unique(train_labels), class_weights))
-class_weight_dict = {0: 3.0, 1: 0.7}
+class_weight_dict = dict(zip(np.unique(train_labels), class_weights))
+#class_weight_dict = {0: 2.6, 1: 0.75}
 print(class_weight_dict)
 
 H = model.fit(

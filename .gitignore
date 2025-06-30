@@ -1,2 +1,8 @@
 venv/
 data/
+
+duplicate_pair_0.png
+duplicate_pair_1.png
+duplicate_pair_2.png
+Train_batch_check.png
+Val_batch_check.png

@@ -45,19 +45,15 @@ class RetinaGenerator(Sequence):
             image = load_img(img_path, target_size = self.image_size)
             image = img_to_array(image)
             
-            image = (image / 127.5) - 1.0
+            image = (image / 127.5) - 1.0 
             
             if self.augmenter:
-                image = self.augmenter.random_transform(image.astype(np.uint8))
+                image = self.augmenter.random_transform(image)
                         
             if self.mode == 'binary':
                 label = float(row['Disease_Risk'])
             else:
                 label = row[self.label_cols].values.astype(np.float32)
-                
-            if np.random.rand() > 0.7:
-                channel = np.random.randint(0, 3)
-                image[..., channel] = 0
                 
             images.append(image)
             labels.append(label)
