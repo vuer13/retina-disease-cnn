@@ -238,11 +238,13 @@ class_weight_dict = dict(zip(np.unique(train_labels), class_weights))
 #class_weight_dict = {0: 2.6, 1: 0.75}
 print(class_weight_dict)
 
+newTotalVal = len(pd.read_csv('./clean_validation/validation_clean.csv'))
+
 H = model.fit(
     x=trainingGen,
     steps_per_epoch=totalTrain // batch_size,
     validation_data=valGen,
-    validation_steps=totalVal // batch_size,
+    validation_steps=newTotalVal // batch_size,
     epochs=epoch,
     callbacks=callbacks,
     class_weight=class_weight_dict
