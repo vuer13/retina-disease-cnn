@@ -6,7 +6,7 @@ from tensorflow.keras.utils import Sequence
 from tensorflow.keras.preprocessing.image import load_img, img_to_array
 
 class RetinaGenerator(Sequence):
-    def __init__(self, csv_path, img_dir, mode='binary', augmenter=None, batch_size=32, image_size=(224, 224), shuffle=True):        
+    def __init__(self, csv_path, img_dir, mode='binary', augmenter=None, batch_size=32, image_size=(224, 224), shuffle=True, balance_class=False):        
         self.df = pd.read_csv(csv_path)
         self.df = self.df[self.df['Disease_Risk'].isin([0, 1])]        
         self.img_dir = img_dir
@@ -15,6 +15,10 @@ class RetinaGenerator(Sequence):
         self.shuffle = shuffle
         self.augmenter = augmenter
         self.mode = mode.lower()
+        self.balance_class = balance_class
+        
+        if self.balance_class:
+            self._balance_classes()
         
         if self.mode == 'binary':
             self.label_cols = ['Disease_Risk']
@@ -59,3 +63,17 @@ class RetinaGenerator(Sequence):
             labels.append(label)
             
         return np.array(images, dtype=np.float32), np.array(labels, dtype=np.float32)
+    
+    def _balance_classes(self):
+        class0 = self.df[self.df["Disease_Risk"] == 0]
+        class1 = self.df[self.df["Disease_Risk"] == 1]
+        
+        minority, majority = (class0, class1) if len(class0) < len(class1) else (class1, class0)
+        
+        upsampled = minority.sample(len(majority), replace=True, random_state=42)
+        
+        self.df = pd.concat([upsampled, majority]).sample(frac=1, random_state=42)
+        self.indexes = np.arange(len(self.df))
+        
+    def get_balanced_labels(self):
+        return self.df['Disease_Risk'].values

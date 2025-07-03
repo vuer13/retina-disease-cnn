@@ -19,42 +19,42 @@ class SimpleNet:
             inputShape = (depth, height, width)
             
         #CONV => RELU => POOL Layers
-        model.add(Conv2D(64, (7, 7), strides=2, input_shape = inputShape, padding='same', kernel_regularizer=reg, kernel_initializer='he_uniform'))
-        model.add(BatchNormalization())
-        model.add(Activation('relu'))
-        model.add(MaxPooling2D(pool_size=(2, 2), strides=2))
-        model.add(Dropout(0.3))
-        
-        model.add(Conv2D(64, (3, 3), input_shape = inputShape, padding='same', kernel_regularizer=reg, kernel_initializer='he_uniform'))
+        model.add(Conv2D(64, (5, 5), input_shape = inputShape, padding='same', kernel_regularizer=reg, kernel_initializer='he_uniform'))
         model.add(BatchNormalization())
         model.add(Activation('relu'))
         model.add(MaxPooling2D(pool_size=(2, 2)))
-        model.add(Dropout(0.3))
+        model.add(Dropout(0.5))
         
-        model.add(Conv2D(128, (3, 3), padding="same", kernel_regularizer=reg, kernel_initializer='he_uniform'))
+        model.add(Conv2D(128, (3, 3), input_shape = inputShape, padding='same', kernel_regularizer=reg, kernel_initializer='he_uniform'))
+        model.add(BatchNormalization())
+        model.add(Activation('relu'))
+        model.add(GlobalAveragePooling2D())
+        model.add(Dropout(0.6))
+        
+        """
+        model.add(Conv2D(256, (3, 3), padding="same", kernel_regularizer=reg, kernel_initializer='he_uniform'))
         model.add(BatchNormalization())
         model.add(Activation("relu"))
         model.add(MaxPooling2D(pool_size=(2, 2)))
-        model.add(Dropout(0.3))
+        model.add(Dropout(0.6))
         
         model.add(Conv2D(256, (3, 3), padding="same", kernel_regularizer=reg, kernel_initializer='he_uniform'))
         model.add(BatchNormalization())
         model.add(Activation("relu"))
         model.add(MaxPooling2D(pool_size=(2, 2)))
         model.add(Dropout(0.3))
-  
+        """
+        
         # FC => RELU Layer
         # model.add(Flatten())
-        model.add(GlobalAveragePooling2D())
-        model.add(Dense(128, kernel_regularizer=reg))
-        model.add(Activation("relu"))
-        model.add(Dropout(0.3))
+        # model.add(GlobalAveragePooling2D())
+        model.add(Dense(classes, kernel_regularizer=reg))
+        # model.add(Activation("relu"))
+        # model.add(Dropout(0.3))
   
         if classes == 1:
-            model.add(Dense(1))
             model.add(Activation('sigmoid')) 
         else:
-            model.add(Dense(classes))
             model.add(Activation('softmax'))
         
         return model
