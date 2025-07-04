@@ -69,11 +69,10 @@ class RetinaGenerator(Sequence):
         class1 = self.df[self.df["Disease_Risk"] == 1]
         
         minority, majority = (class0, class1) if len(class0) < len(class1) else (class1, class0)
-        
         upsampled = minority.sample(len(majority), replace=True, random_state=42)
         
         self.df = pd.concat([upsampled, majority]).sample(frac=1, random_state=42)
         self.indexes = np.arange(len(self.df))
-        
+                
     def get_balanced_labels(self):
         return self.df['Disease_Risk'].values

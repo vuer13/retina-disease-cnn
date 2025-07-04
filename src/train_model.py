@@ -7,11 +7,12 @@ from tensorflow.keras.callbacks import EarlyStopping
 from tensorflow.keras.callbacks import CSVLogger, ModelCheckpoint
 from tensorflow.keras.optimizers import SGD, Adam
 from tensorflow.keras.regularizers import l2
-from tensorflow.keras.metrics import Recall, AUC
+from tensorflow.keras.metrics import Recall, AUC, Precision
 from sklearn.utils.class_weight import compute_class_weight
 from sklearn.metrics import classification_report
 from sklearn.metrics import confusion_matrix
 from sklearn.metrics import roc_auc_score, RocCurveDisplay
+from sklearn.metrics import f1_score
 from imutils import paths
 import matplotlib.pyplot as plt
 import numpy as np
@@ -35,7 +36,7 @@ ap.add_argument("-p", "--plot", type=str, default="plot.png",
 args = vars(ap.parse_args())
 
 epoch = 50
-lr = 5e-5
+lr = 1e-4
 batch_size = 32
 maxEpoch = epoch
 
@@ -60,26 +61,18 @@ for data, new in datasets.items():
     df = df.sample(frac = 1, random_state = 42).reset_index(drop=True)
     df.to_csv(new)
     
-print("checkpoint1")
-
 trainAug = ImageDataGenerator(
-	rotation_range=15,
+	rotation_range=5,
     zoom_range=0.1,
-    width_shift_range=0.1,
-    height_shift_range=0.1,
-    shear_range=0.05,
+    width_shift_range=0.02,
+    height_shift_range=0.02,
     horizontal_flip=True,
-    vertical_flip=True,  
-    brightness_range=[0.9, 1.1],
-    channel_shift_range=20.0,
-    fill_mode="reflect"
+    fill_mode="constant"
 )
 
 valAug = ImageDataGenerator()
 
 testAug = ImageDataGenerator()
-
-
 
 train_csv = os.path.join(config.DATASET_PATH_TRAIN, 'RFMiD_Training_Labels_new.csv')
 val_csv = os.path.join(config.DATASET_PATH_VAL, 'RFMiD_Validation_Labels_new.csv')
@@ -89,15 +82,33 @@ train_dir = os.path.join(config.DATASET_PATH_TRAIN, 'Training')
 val_dir = os.path.join(config.DATASET_PATH_VAL, 'Validation')
 test_dir = os.path.join(config.DATASET_PATH_TEST, 'Test')
 
-def get_robust_hash(img_path, hash_size=8):
+# For deduplication - not necessary as their arent actually any duplicates
+"""
+def get_robust_hash(img_path, hash_size=16):
     try:
+        img = Image.open(img_path).convert('L')
         img = Image.open(img_path).resize((256, 256))
-        img = img.filter(ImageFilter.GaussianBlur(radius=0.5))
+        img = img.filter(ImageFilter.GaussianBlur(radius=1.0))
         return imagehash.phash(img, hash_size=hash_size)
     except Exception as e:
         print(f"Skipping {img_path}: {str(e)}")
         return None
 
+def compare_images(img_path1, img_path2, threshold=0.9):
+    try:
+        img1 = Image.open(img_path1).resize((256, 256))
+        img2 = Image.open(img_path2).resize((256, 256))
+        
+        # Compare both hash and histogram
+        hash_diff = imagehash.phash(img1) - imagehash.phash(img2)
+        hist_diff = cv2.compareHist(
+            cv2.calcHist([np.array(img1)], [0], None, [256], [0,256]),
+            cv2.calcHist([np.array(img2)], [0], None, [256], [0,256]),
+            cv2.HISTCMP_CORREL
+        )
+        return hash_diff < 5 and hist_diff > threshold
+    except:
+        return False
 
 #DOUBLE CHECK HERE
 VAL_CSV_PATH = '../data/Evaluation_Set/Evaluation_Set/RFMiD_Validation_Labels_new.csv'
@@ -114,46 +125,54 @@ for train_img in os.listdir(TRAIN_IMG_DIR):
     if train_img.endswith('.png'):
         train_path = os.path.join(TRAIN_IMG_DIR, train_img)
         try:
-            train_hashes[train_img] = imagehash.phash(Image.open(train_path))
-        except:
-            continue
+            img = Image.open(train_path).resize((256, 256))
+            img = img.filter(ImageFilter.GaussianBlur(radius=0.5))
+            train_hashes[train_img] = imagehash.phash(img)
+        except Exception as e:
+            print(f"Skipping {train_img}: {str(e)}")
 
 valid_samples = []
 duplicates_removed = 0
 missing_removed = 0
 
-print("Processing validation set...")
-for idx, row in val_df.iterrows():
+val_df = pd.read_csv(VAL_CSV_PATH)
+duplicates = []
+valid_samples = []
+
+for _, row in val_df.iterrows():
     img_id = row['ID']
     img_path = os.path.join(VAL_IMG_DIR, f"{img_id}.png")
-    img_file = f"{img_id}.png"
     
     if not os.path.exists(img_path):
-        missing_removed += 1
-        continue
+        continue  
         
     try:
-        val_hash = imagehash.phash(Image.open(img_path))
-        is_duplicate = any(val_hash == train_hash for train_hash in train_hashes.values())
+        val_img = Image.open(img_path).resize((256, 256))
+        val_img = val_img.filter(ImageFilter.GaussianBlur(radius=0.5))
+        val_hash = imagehash.phash(val_img)
         
-        if not is_duplicate:
-            shutil.copy(img_path, f'./clean_validation/images/{img_id}.png')
-            valid_samples.append(row)
+        is_duplicate = any(
+            (val_hash - train_hash) < 5  
+            for train_hash in train_hashes.values()
+        )
+        
+        if is_duplicate:
+            duplicates.append(img_id)
         else:
-            duplicates_removed += 1
-    except:
-        continue
+            valid_samples.append(row)
+    except Exception as e:
+        print(f"Error processing {img_id}: {str(e)}")
 
+print(f"\nFound {len(duplicates)} duplicates")
 clean_df = pd.DataFrame(valid_samples)
-clean_df.to_csv(clean_csv_path, index=False)
+clean_df.to_csv('./clean_validation/validation_clean.csv', index=False)
 
-print("\n=== RESULTS ===")
-print(f"Removed duplicates: {duplicates_removed}")
-print(f"Removed missing files: {missing_removed}")
-print(f"Final clean samples: {len(clean_df)}")
+df_cleaned = pd.read_csv('./clean_validation/validation_clean.csv')
 
-    
-
+df_balanced = df_cleaned.groupby('Disease_Risk').apply(lambda x: x.sample(n=min(len(x), 75), random_state=42)).reset_index(drop=True)
+df_balanced = df_balanced.sample(frac = 1, random_state = 42).reset_index(drop=True)
+df_balanced.to_csv('./clean_validation/validation_clean.csv', index=False)
+""" 
     
 trainingGen = RetinaGenerator(
     csv_path = train_csv,
@@ -162,17 +181,19 @@ trainingGen = RetinaGenerator(
     augmenter = trainAug,
     batch_size = batch_size,
     image_size = (224, 224),
-    shuffle = True
+    shuffle = True,
+    balance_class=True
 )
 
 valGen = RetinaGenerator(
-    csv_path = clean_csv_path,
-    img_dir = './clean_validation/images',
+    csv_path = val_csv,
+    img_dir = val_dir,
     mode = 'binary',
     augmenter = valAug,
     batch_size = batch_size,
     image_size = (224, 224),
-    shuffle = False
+    shuffle = False,
+    balance_class=False
 )
 
 testGen = RetinaGenerator(
@@ -185,12 +206,15 @@ testGen = RetinaGenerator(
     shuffle = False
 ) 
 
-print("checkpoint2")
+train_counts = np.unique(next(iter(trainingGen))[1], return_counts=True)
+val_counts = np.unique(next(iter(valGen))[1], return_counts=True)
 
-def focal_loss(gamma=2.0, alpha=0.75):
+print(f"Train class distribution: {train_counts}")
+print(f"Val class distribution: {val_counts}")
+
+def focal_loss(gamma=3.0, alpha=0.75):
     def loss_fn(y_true, y_pred):
-        epsilon = tf.keras.backend.epsilon()
-        y_pred = tf.clip_by_value(y_pred, epsilon, 1. - epsilon)
+        y_pred = tf.clip_by_value(y_pred, 1e-7, 1 - 1e-7)
 
         cross_entropy = -y_true * tf.math.log(y_pred) - (1 - y_true) * tf.math.log(1 - y_pred)
         weight = alpha * tf.pow(1 - y_pred, gamma) * y_true + (1 - alpha) * tf.pow(y_pred, gamma) * (1 - y_true)
@@ -198,62 +222,61 @@ def focal_loss(gamma=2.0, alpha=0.75):
     
     return loss_fn
 
-X, y = next(iter(valGen))
-print("[VAL SANITY CHECK]", np.unique(y, return_counts=True))
-
-model = SimpleNet.build(224, 224, 3, classes=1, reg=l2(0.0001))
+model = SimpleNet.build(224, 224, 3, classes=1, reg=l2(0.001))
 opt = Adam(learning_rate=lr)
-model.compile(loss=focal_loss(), optimizer=opt, metrics=['accuracy', Recall(), AUC()])
-
-early_stop = EarlyStopping(
-    monitor='val_auc',
-    mode='max',
-    patience=10,
-    min_delta=0.01,
-    baseline=0.6,
-    restore_best_weights=True,
-    verbose=1
-)
+model.compile(loss=focal_loss(), optimizer=opt, metrics=['accuracy', Recall(), AUC(), Precision()])
 
 #callbacks =[LearningRateScheduler(poly_decay), early_stop]
-callbacks = [ReduceLROnPlateau(monitor='val_auc', mode='max', factor = 0.45, patience=3, min_lr=1e-6, verbose=1, min_delta=0.005), 
-             early_stop,
+callbacks = [ReduceLROnPlateau(monitor='val_auc', factor = 0.5, patience=3, mode='max'), 
+             EarlyStopping(monitor='val_recall', mode='max', patience=5, restore_best_weights=True),
              CSVLogger('training.log'),
-             ModelCheckpoint('../model/best_model.h5',
-                            save_best_only=True,
-                            save_weights=False,
-                            monitor='val_auc',
-                            mode='max',
-                            verbose=1)]
+             ModelCheckpoint('../model/best_model.h5', save_best_only=True, save_weights=False, monitor='val_auc', mode='max', verbose=1)]
 
-train_labels = pd.read_csv(config.DATASET_PATH_TRAIN + '/RFMiD_Training_Labels_new.csv')["Disease_Risk"]
-print(train_labels.value_counts(normalize=True))
+original_df = pd.read_csv(train_csv)
+original_labels = original_df['Disease_Risk'].values
+#train_labels = trainingGen.get_balanced_labels()
 
 class_weights = compute_class_weight(
     class_weight='balanced',
-    classes=np.unique(train_labels),
-    y=train_labels
+    classes=np.unique(original_labels),
+    y=original_labels
 )
-class_weight_dict = dict(zip(np.unique(train_labels), class_weights))
-#class_weight_dict = {0: 2.6, 1: 0.75}
+#class_weight_dict = dict(zip(np.unique(original_labels), class_weights))
+class_weight_dict = {0: 3.0, 1: 0.63}
 print(class_weight_dict)
 
-newTotalVal = len(pd.read_csv('./clean_validation/validation_clean.csv'))
+#newTotalVal = len(pd.read_csv('./clean_validation/validation_clean.csv'))
 
 H = model.fit(
     x=trainingGen,
-    steps_per_epoch=totalTrain // batch_size,
+    steps_per_epoch=len(trainingGen),
     validation_data=valGen,
-    validation_steps=newTotalVal // batch_size,
+    validation_steps=len(valGen),
     epochs=epoch,
     callbacks=callbacks,
+    shuffle=False,
     class_weight=class_weight_dict
 )
 
-print("checkpoint3")
+val_labels = []
+val_preds = []
+for i in range(len(valGen)):
+    x, y = valGen[i]
+    val_labels.extend(y.flatten())
+    val_preds.extend(model.predict(x, verbose=0).flatten())
+
+val_labels = np.array(val_labels)
+val_preds = np.array(val_preds)
+print(f"Final counts - Labels: {len(val_labels)}, Predictions: {len(val_preds)}")
+
+assert len(val_labels) == len(val_preds), f"Shape mismatch: {len(val_labels)} vs {len(val_preds)}"
+
+thresholds = np.linspace(0.1, 0.9, 25)
+best_thresh = max(thresholds, key=lambda t: f1_score(val_labels, val_preds > t, average='weighted'))
+print(f"Optimal Threshold: {best_thresh:.3f}")
 
 predId = model.predict(x=testGen, steps=(totalTest // batch_size) + 1)
-predId = (predId > 0.3).astype("int32")
+predId = (predId > best_thresh).astype("int32")
 
 test_df = pd.read_csv(config.DATASET_PATH_TEST + '/RFMiD_Testing_Labels_new.csv')
 y_true = test_df["Disease_Risk"].astype("int32").values
