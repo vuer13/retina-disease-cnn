@@ -10,3 +10,10 @@ Val_batch_check.png
 clean_validation/
 duplicates_removed/
 quarantine_duplicates/
+
+*.png
+plot2.png
+plot3.png
+
+model/
+training.log
