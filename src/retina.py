@@ -6,7 +6,7 @@ from tensorflow.keras.utils import Sequence
 from tensorflow.keras.preprocessing.image import load_img, img_to_array
 
 class RetinaGenerator(Sequence):
-    def __init__(self, csv_path, img_dir, mode='binary', augmenter=None, batch_size=64, image_size=(224, 224), shuffle=True, balance_class=False):        
+    def __init__(self, csv_path, img_dir, mode='binary', augmenter=None, batch_size=32, image_size=(224, 224), shuffle=True, balance_class=False):        
         self.df = pd.read_csv(csv_path)
         self.df = self.df[self.df['Disease_Risk'].isin([0, 1])]        
         self.img_dir = img_dir
