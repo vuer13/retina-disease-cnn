@@ -35,9 +35,9 @@ ap.add_argument("-p", "--plot", type=str, default="plot.png",
 	help="path to output loss/accuracy plot")
 args = vars(ap.parse_args())
 
-epoch = 50
+epoch = 10
 lr = 1e-4
-batch_size = 32
+batch_size = 64
 maxEpoch = epoch
 
 def poly_decay(epoch):
@@ -65,7 +65,6 @@ trainAug = ImageDataGenerator(
 	rotation_range=5,
     zoom_range=0.1,
     width_shift_range=0.02,
-    height_shift_range=0.02,
     horizontal_flip=True,
     fill_mode="constant"
 )
@@ -81,98 +80,6 @@ test_csv = os.path.join(config.DATASET_PATH_TEST, 'RFMiD_Testing_Labels_new.csv'
 train_dir = os.path.join(config.DATASET_PATH_TRAIN, 'Training')
 val_dir = os.path.join(config.DATASET_PATH_VAL, 'Validation')
 test_dir = os.path.join(config.DATASET_PATH_TEST, 'Test')
-
-# For deduplication - not necessary as their arent actually any duplicates
-"""
-def get_robust_hash(img_path, hash_size=16):
-    try:
-        img = Image.open(img_path).convert('L')
-        img = Image.open(img_path).resize((256, 256))
-        img = img.filter(ImageFilter.GaussianBlur(radius=1.0))
-        return imagehash.phash(img, hash_size=hash_size)
-    except Exception as e:
-        print(f"Skipping {img_path}: {str(e)}")
-        return None
-
-def compare_images(img_path1, img_path2, threshold=0.9):
-    try:
-        img1 = Image.open(img_path1).resize((256, 256))
-        img2 = Image.open(img_path2).resize((256, 256))
-        
-        # Compare both hash and histogram
-        hash_diff = imagehash.phash(img1) - imagehash.phash(img2)
-        hist_diff = cv2.compareHist(
-            cv2.calcHist([np.array(img1)], [0], None, [256], [0,256]),
-            cv2.calcHist([np.array(img2)], [0], None, [256], [0,256]),
-            cv2.HISTCMP_CORREL
-        )
-        return hash_diff < 5 and hist_diff > threshold
-    except:
-        return False
-
-#DOUBLE CHECK HERE
-VAL_CSV_PATH = '../data/Evaluation_Set/Evaluation_Set/RFMiD_Validation_Labels_new.csv'
-VAL_IMG_DIR = '../data/Evaluation_Set/Evaluation_Set/Validation'
-TRAIN_IMG_DIR = '../data/Training_Set/Training_Set/Training'
-
-val_df = pd.read_csv(VAL_CSV_PATH)
-
-os.makedirs('./clean_validation/images', exist_ok=True)
-clean_csv_path = './clean_validation/validation_clean.csv'
-
-train_hashes = {}
-for train_img in os.listdir(TRAIN_IMG_DIR):
-    if train_img.endswith('.png'):
-        train_path = os.path.join(TRAIN_IMG_DIR, train_img)
-        try:
-            img = Image.open(train_path).resize((256, 256))
-            img = img.filter(ImageFilter.GaussianBlur(radius=0.5))
-            train_hashes[train_img] = imagehash.phash(img)
-        except Exception as e:
-            print(f"Skipping {train_img}: {str(e)}")
-
-valid_samples = []
-duplicates_removed = 0
-missing_removed = 0
-
-val_df = pd.read_csv(VAL_CSV_PATH)
-duplicates = []
-valid_samples = []
-
-for _, row in val_df.iterrows():
-    img_id = row['ID']
-    img_path = os.path.join(VAL_IMG_DIR, f"{img_id}.png")
-    
-    if not os.path.exists(img_path):
-        continue  
-        
-    try:
-        val_img = Image.open(img_path).resize((256, 256))
-        val_img = val_img.filter(ImageFilter.GaussianBlur(radius=0.5))
-        val_hash = imagehash.phash(val_img)
-        
-        is_duplicate = any(
-            (val_hash - train_hash) < 5  
-            for train_hash in train_hashes.values()
-        )
-        
-        if is_duplicate:
-            duplicates.append(img_id)
-        else:
-            valid_samples.append(row)
-    except Exception as e:
-        print(f"Error processing {img_id}: {str(e)}")
-
-print(f"\nFound {len(duplicates)} duplicates")
-clean_df = pd.DataFrame(valid_samples)
-clean_df.to_csv('./clean_validation/validation_clean.csv', index=False)
-
-df_cleaned = pd.read_csv('./clean_validation/validation_clean.csv')
-
-df_balanced = df_cleaned.groupby('Disease_Risk').apply(lambda x: x.sample(n=min(len(x), 75), random_state=42)).reset_index(drop=True)
-df_balanced = df_balanced.sample(frac = 1, random_state = 42).reset_index(drop=True)
-df_balanced.to_csv('./clean_validation/validation_clean.csv', index=False)
-""" 
     
 trainingGen = RetinaGenerator(
     csv_path = train_csv,
@@ -212,7 +119,7 @@ val_counts = np.unique(next(iter(valGen))[1], return_counts=True)
 print(f"Train class distribution: {train_counts}")
 print(f"Val class distribution: {val_counts}")
 
-def focal_loss(gamma=3.0, alpha=0.75):
+def focal_loss(gamma=3.5, alpha=0.8):
     def loss_fn(y_true, y_pred):
         y_pred = tf.clip_by_value(y_pred, 1e-7, 1 - 1e-7)
 
@@ -227,8 +134,8 @@ opt = Adam(learning_rate=lr)
 model.compile(loss=focal_loss(), optimizer=opt, metrics=['accuracy', Recall(), AUC(), Precision()])
 
 #callbacks =[LearningRateScheduler(poly_decay), early_stop]
-callbacks = [ReduceLROnPlateau(monitor='val_auc', factor = 0.5, patience=3, mode='max'), 
-             EarlyStopping(monitor='val_recall', mode='max', patience=5, restore_best_weights=True),
+callbacks = [ReduceLROnPlateau(monitor='val_precision', factor = 0.5, patience=2, mode='max'), 
+             EarlyStopping(monitor='val_recall', mode='max', patience=5, baseline=0.4, restore_best_weights=True),
              CSVLogger('training.log'),
              ModelCheckpoint('../model/best_model.h5', save_best_only=True, save_weights=False, monitor='val_auc', mode='max', verbose=1)]
 
@@ -242,7 +149,7 @@ class_weights = compute_class_weight(
     y=original_labels
 )
 #class_weight_dict = dict(zip(np.unique(original_labels), class_weights))
-class_weight_dict = {0: 3.0, 1: 0.63}
+class_weight_dict = {0: 3.25, 1: 0.7}
 print(class_weight_dict)
 
 #newTotalVal = len(pd.read_csv('./clean_validation/validation_clean.csv'))
@@ -267,12 +174,9 @@ for i in range(len(valGen)):
 
 val_labels = np.array(val_labels)
 val_preds = np.array(val_preds)
-print(f"Final counts - Labels: {len(val_labels)}, Predictions: {len(val_preds)}")
 
-assert len(val_labels) == len(val_preds), f"Shape mismatch: {len(val_labels)} vs {len(val_preds)}"
-
-thresholds = np.linspace(0.1, 0.9, 25)
-best_thresh = max(thresholds, key=lambda t: f1_score(val_labels, val_preds > t, average='weighted'))
+thresholds = np.linspace(0.1, 0.9, 50)
+best_thresh = max(thresholds, key=lambda t: f1_score(val_labels, val_preds > t, pos_label=0))
 print(f"Optimal Threshold: {best_thresh:.3f}")
 
 predId = model.predict(x=testGen, steps=(totalTest // batch_size) + 1)
@@ -280,7 +184,6 @@ predId = (predId > best_thresh).astype("int32")
 
 test_df = pd.read_csv(config.DATASET_PATH_TEST + '/RFMiD_Testing_Labels_new.csv')
 y_true = test_df["Disease_Risk"].astype("int32").values
-print(np.unique(y_true))
 
 print(classification_report(y_true[:len(predId)], predId))
 print(confusion_matrix(y_true[:len(predId)], predId))
