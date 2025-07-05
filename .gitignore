@@ -19,3 +19,4 @@ model/
 training.log
 
 extra.py
+__pycache__/
