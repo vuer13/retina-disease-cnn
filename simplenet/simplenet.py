@@ -49,7 +49,7 @@ class SimpleNet:
         # model.add(GlobalAveragePooling2D())
         model.add(Dense(classes, kernel_regularizer=reg))
         # model.add(Activation("relu"))
-        # model.add(Dropout(0.3))
+        # model.add(Dropout(0.4))
   
         if classes == 1:
             model.add(Activation('sigmoid')) 
