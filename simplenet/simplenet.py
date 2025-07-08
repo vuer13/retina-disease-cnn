@@ -19,24 +19,23 @@ class SimpleNet:
             inputShape = (depth, height, width)
             
         #CONV => RELU => POOL Layers
-        model.add(Conv2D(32, (7, 7), input_shape = inputShape, padding='same', kernel_regularizer=reg, kernel_initializer='he_uniform'))
-        model.add(BatchNormalization())
-        model.add(Activation('relu'))
-        model.add(MaxPooling2D(pool_size=(2, 2)))
-        model.add(Dropout(0.4))
-        
         model.add(Conv2D(64, (5, 5), input_shape = inputShape, padding='same', kernel_regularizer=reg, kernel_initializer='he_uniform'))
         model.add(BatchNormalization())
         model.add(Activation('relu'))
         model.add(MaxPooling2D(pool_size=(2, 2)))
         model.add(Dropout(0.4))
         
-        model.add(Conv2D(128, (3, 3), padding="same", kernel_regularizer=reg, kernel_initializer='he_uniform'))
+        model.add(Conv2D(128, (3, 3), input_shape = inputShape, padding='same', kernel_regularizer=reg, kernel_initializer='he_uniform'))
+        model.add(BatchNormalization())
+        model.add(Activation('relu'))
+        model.add(MaxPooling2D(pool_size=(2, 2)))
+        model.add(Dropout(0.4))
+        
+        model.add(Conv2D(256, (3, 3), padding="same", kernel_regularizer=reg, kernel_initializer='he_uniform'))
         model.add(BatchNormalization())
         model.add(Activation("relu"))
-        model.add(MaxPooling2D(pool_size=(2, 2)))
-        model.add(Dropout(0.5))
-        
+        model.add(GlobalAveragePooling2D())
+        model.add(Dropout(0.4))
         """
         model.add(Conv2D(256, (3, 3), padding="same", kernel_regularizer=reg, kernel_initializer='he_uniform'))
         model.add(BatchNormalization())
@@ -47,10 +46,10 @@ class SimpleNet:
         
         # FC => RELU Layer
         # model.add(Flatten())
-        model.add(GlobalAveragePooling2D())
-        model.add(Dense(64, kernel_regularizer=reg))
-        model.add(Activation("relu"))
-        model.add(Dropout(0.5))
+        # model.add(GlobalAveragePooling2D())
+        model.add(Dense(classes, kernel_regularizer=reg))
+        # model.add(Activation("relu"))
+        # model.add(Dropout(0.3))
   
         if classes == 1:
             model.add(Activation('sigmoid')) 

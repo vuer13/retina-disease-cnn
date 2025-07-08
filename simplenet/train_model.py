@@ -155,8 +155,8 @@ class_weights = compute_class_weight(
     classes=np.unique(original_labels),
     y=original_labels
 )
-#class_weight_dict = dict(zip(np.unique(original_labels), class_weights))
-class_weight_dict = {0: 2.0, 1: 0.5}
+class_weight_dict = dict(zip(np.unique(original_labels), class_weights))
+#class_weight_dict = {0: 2.0, 1: 0.5}
 print(class_weight_dict)
 
 H = model.fit(
