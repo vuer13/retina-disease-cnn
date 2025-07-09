@@ -36,7 +36,7 @@ ap.add_argument("-p", "--plot", type=str, default="plot.png",
 	help="path to output loss/accuracy plot")
 args = vars(ap.parse_args())
 
-epoch = 10
+epoch = 32
 lr = 1e-4
 batch_size = 32
 maxEpoch = epoch
