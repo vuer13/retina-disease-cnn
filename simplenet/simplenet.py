@@ -1,5 +1,5 @@
 from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Conv2D
+from tensorflow.keras.layers import Conv2D, SeparableConv2D
 from tensorflow.keras.layers import MaxPooling2D
 from tensorflow.keras.layers import Activation
 from tensorflow.keras.layers import Flatten
@@ -23,13 +23,13 @@ class SimpleNet:
         model.add(BatchNormalization())
         model.add(Activation('relu'))
         model.add(MaxPooling2D(pool_size=(2, 2)))
-        model.add(Dropout(0.4))
+        model.add(Dropout(0.5))
         
         model.add(Conv2D(128, (3, 3), input_shape = inputShape, padding='same', kernel_regularizer=reg, kernel_initializer='he_uniform'))
         model.add(BatchNormalization())
         model.add(Activation('relu'))
         model.add(MaxPooling2D(pool_size=(2, 2)))
-        model.add(Dropout(0.4))
+        model.add(Dropout(0.6))
         
         model.add(Conv2D(256, (3, 3), padding="same", kernel_regularizer=reg, kernel_initializer='he_uniform'))
         model.add(BatchNormalization())
@@ -47,12 +47,12 @@ class SimpleNet:
         # FC => RELU Layer
         # model.add(Flatten())
         # model.add(GlobalAveragePooling2D())
-        # model.add(Dense(classes, activation='relu'))
-        # model.add(Dropout(0.4))
+        model.add(Dense(256, activation='relu', kernel_regularizer=reg))
+        model.add(Dropout(0.6))
   
         if classes == 1:
-            model.add(Dense(classes, activation='sigmoid'))
+            model.add(Dense(classes, activation='sigmoid', kernel_regularizer=reg))
         else:
-            model.add(Dense(classes, activation='softmax'))
+            model.add(Dense(classes, activation='softmax', kernel_regularizer=reg))
 
         return model

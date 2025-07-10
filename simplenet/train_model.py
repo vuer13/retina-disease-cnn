@@ -9,6 +9,7 @@ from tensorflow.keras.optimizers import SGD, Adam
 from tensorflow.keras.regularizers import l2
 from tensorflow.keras.metrics import Recall, AUC, Precision
 from sklearn.utils.class_weight import compute_class_weight
+from tensorflow.keras.optimizers.schedules import CosineDecayRestarts
 from sklearn.metrics import classification_report
 from sklearn.metrics import confusion_matrix
 from sklearn.metrics import roc_auc_score, RocCurveDisplay
@@ -36,7 +37,7 @@ ap.add_argument("-p", "--plot", type=str, default="plot.png",
 	help="path to output loss/accuracy plot")
 args = vars(ap.parse_args())
 
-epoch = 50
+epoch = 40
 lr = 1e-4
 batch_size = 64
 maxEpoch = epoch
@@ -136,13 +137,22 @@ def focal_loss(gamma=2.0, alpha=0.5):
     
     return loss_fn
 
+steps_per_epoch = len(trainingGen)
+
+lr_schedule = CosineDecayRestarts(
+    initial_lr_rate = lr,
+    first_decay_steps = 10 * steps_per_epoch,
+    t_mul = 1.0,
+    m_mul = 0.9
+)
+
 model = SimpleNet.build(224, 224, 3, classes=1, reg=l2(0.001))
-opt = Adam(learning_rate=lr, global_clipnorm = 1.0)
+opt = Adam(learning_rate=lr_schedule, global_clipnorm = 1.0)
 model.compile(loss=focal_loss(), optimizer=opt, metrics=['accuracy', Recall(), AUC(), Precision()])
 
 #callbacks =[LearningRateScheduler(poly_decay), early_stop]
 callbacks = [ReduceLROnPlateau(monitor='val_loss', factor = 0.5, patience=3, min_lr = 1e-7), 
-             EarlyStopping(monitor='val_auc', mode='max', patience=8, baseline=0.7, restore_best_weights=True),
+             EarlyStopping(monitor='val_auc', mode='max', patience=10, baseline=0.7, restore_best_weights=True),
              CSVLogger('training.log'),
              ModelCheckpoint('../model/best_model.h5', save_best_only=True, save_weights=False, monitor='val_auc', mode='max', verbose=1)]
 
