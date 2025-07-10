@@ -36,9 +36,9 @@ ap.add_argument("-p", "--plot", type=str, default="plot.png",
 	help="path to output loss/accuracy plot")
 args = vars(ap.parse_args())
 
-epoch = 32
+epoch = 50
 lr = 1e-4
-batch_size = 32
+batch_size = 64
 maxEpoch = epoch
 
 """
@@ -66,10 +66,10 @@ for data, new in datasets.items():
     
 trainAug = ImageDataGenerator(
 	rotation_range=15,
-    zoom_range=0.1,
-    width_shift_range=0.1,
-    height_shift_range=0.1,
-    shear_range=0.05, 
+    zoom_range=0.15,
+    width_shift_range=0.15,
+    height_shift_range=0.15,
+    shear_range=0.1, 
     horizontal_flip=True,
     vertical_flip=True,
     brightness_range=[0.9, 1.1],
@@ -126,7 +126,7 @@ val_counts = np.unique(next(iter(valGen))[1], return_counts=True)
 print(f"Train class distribution: {train_counts}")
 print(f"Val class distribution: {val_counts}")
 
-def focal_loss(gamma=2.0, alpha=0.75):
+def focal_loss(gamma=2.0, alpha=0.5):
     def loss_fn(y_true, y_pred):
         y_pred = tf.clip_by_value(y_pred, 1e-7, 1 - 1e-7)
 
@@ -137,12 +137,12 @@ def focal_loss(gamma=2.0, alpha=0.75):
     return loss_fn
 
 model = SimpleNet.build(224, 224, 3, classes=1, reg=l2(0.001))
-opt = Adam(learning_rate=lr, clipvalue = 0.5)
+opt = Adam(learning_rate=lr, global_clipnorm = 1.0)
 model.compile(loss=focal_loss(), optimizer=opt, metrics=['accuracy', Recall(), AUC(), Precision()])
 
 #callbacks =[LearningRateScheduler(poly_decay), early_stop]
-callbacks = [ReduceLROnPlateau(monitor='val_loss', factor = 0.2, patience=2, min_lr = 1e-6), 
-             EarlyStopping(monitor='val_auc', mode='max', patience=15, baseline=0.7, restore_best_weights=True),
+callbacks = [ReduceLROnPlateau(monitor='val_loss', factor = 0.5, patience=3, min_lr = 1e-7), 
+             EarlyStopping(monitor='val_auc', mode='max', patience=8, baseline=0.7, restore_best_weights=True),
              CSVLogger('training.log'),
              ModelCheckpoint('../model/best_model.h5', save_best_only=True, save_weights=False, monitor='val_auc', mode='max', verbose=1)]
 
@@ -155,9 +155,9 @@ class_weights = compute_class_weight(
     classes=np.unique(original_labels),
     y=original_labels
 )
-class_weight_dict = dict(zip(np.unique(original_labels), class_weights))
-#class_weight_dict = {0: 2.0, 1: 0.5}
-print(class_weight_dict)
+#class_weight_dict = dict(zip(np.unique(original_labels), class_weights))
+#class_weight_dict = {0: 4.0, 1: 0.5}
+#print(class_weight_dict)
 
 H = model.fit(
     x=trainingGen,
@@ -166,8 +166,7 @@ H = model.fit(
     validation_steps=len(valGen),
     epochs=epoch,
     callbacks=callbacks,
-    shuffle=False,
-    class_weight=class_weight_dict
+    shuffle=False
 )
 
 val_labels = []
@@ -180,7 +179,7 @@ for i in range(len(valGen)):
 val_labels = np.array(val_labels)
 val_preds = np.array(val_preds)
 
-thresholds = np.linspace(0.1, 0.7, 50) 
+thresholds = np.linspace(0.3, 0.7, 50) 
 best_thresh = max(thresholds, key=lambda t: f1_score(val_labels, val_preds > t, pos_label=1))
 print(f"Optimal Threshold: {best_thresh:.3f}")
 
