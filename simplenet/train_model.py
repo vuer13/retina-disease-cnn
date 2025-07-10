@@ -68,13 +68,14 @@ for data, new in datasets.items():
 trainAug = ImageDataGenerator(
 	rotation_range=15,
     zoom_range=0.15,
-    width_shift_range=0.15,
+    width_shift_range=0.1,
     height_shift_range=0.15,
-    shear_range=0.1, 
+    shear_range=0.05, 
     horizontal_flip=True,
     vertical_flip=True,
     brightness_range=[0.9, 1.1],
-    fill_mode="constant"
+    fill_mode="reflect",
+    channel_shift_range=10
 )
 
 valAug = ImageDataGenerator()
