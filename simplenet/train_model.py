@@ -140,7 +140,7 @@ def focal_loss(gamma=2.0, alpha=0.5):
 steps_per_epoch = len(trainingGen)
 
 lr_schedule = CosineDecayRestarts(
-    initial_lr_rate = lr,
+    initial_learning_rate = lr,
     first_decay_steps = 10 * steps_per_epoch,
     t_mul = 1.0,
     m_mul = 0.9
