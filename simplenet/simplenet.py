@@ -29,7 +29,7 @@ class SimpleNet:
         model.add(BatchNormalization())
         model.add(Activation('relu'))
         model.add(MaxPooling2D(pool_size=(2, 2)))
-        model.add(Dropout(0.6))
+        model.add(Dropout(0.5))
         
         model.add(Conv2D(256, (3, 3), padding="same", kernel_regularizer=reg, kernel_initializer='he_uniform'))
         model.add(BatchNormalization())
