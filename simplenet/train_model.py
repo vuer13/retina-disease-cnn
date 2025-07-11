@@ -16,6 +16,7 @@ from sklearn.metrics import confusion_matrix
 from sklearn.metrics import roc_auc_score, RocCurveDisplay
 from sklearn.metrics import f1_score
 from sklearn.metrics import recall_score
+from sklearn.metrics import balanced_accuracy_score
 from imutils import paths
 import matplotlib.pyplot as plt
 import numpy as np
@@ -68,15 +69,14 @@ for data, new in datasets.items():
     
 trainAug = ImageDataGenerator(
 	rotation_range=15,
-    zoom_range=0.15,
+    zoom_range=0.1,
     width_shift_range=0.1,
     height_shift_range=0.1,
     shear_range=0.05, 
     horizontal_flip=True,
     vertical_flip=True,
     brightness_range=[0.9, 1.1],
-    fill_mode="reflect",
-    channel_shift_range=10
+    fill_mode="constant"
 )
 
 valAug = ImageDataGenerator()
@@ -129,6 +129,28 @@ val_counts = np.unique(next(iter(valGen))[1], return_counts=True)
 print(f"Train class distribution: {train_counts}")
 print(f"Val class distribution: {val_counts}")
 
+class BalancedMetrics(tf.keras.callbacks.Callback):
+    def __init__(self, validation_data):
+        super().__init__()
+        self.validation_data = validation_data
+        
+    def on_epoch_end(self, epoch, logs=None):
+        val_labels, val_preds = [], []
+        valGen.on_epoch_end()
+        for i in range(len(valGen)):
+            x, y = valGen[i]
+            val_labels.extend(y.flatten())
+            val_preds.extend(self.model.predict(x, verbose=0).flatten())
+            
+        val_labels = np.array(val_labels)
+        val_preds = np.array(val_preds)
+        
+        val_preds_class = (val_preds > 0.5).astype(int)
+        balanced_acc = balanced_accuracy_score(val_labels, val_preds_class)
+        
+        logs['val_balanced_acc'] = balanced_acc
+        print(f"\nVal Balanced Acc: {balanced_acc:.4f}")
+
 def focal_loss(gamma=2.0, alpha=0.5):
     def loss_fn(y_true, y_pred):
         y_pred = tf.clip_by_value(y_pred, 1e-7, 1 - 1e-7)
@@ -140,23 +162,26 @@ def focal_loss(gamma=2.0, alpha=0.5):
     return loss_fn
 
 def lr_schedule(epoch):
-    if epoch < 10:
-        return lr * (epoch + 1) / 10
-    elif 10 <= epoch < 25:
+    if epoch < 5:
+        return lr * (epoch + 1) / 5
+    elif 5 <= epoch < 20:
         return lr
     else:
-        return lr * (0.95 ** (epoch - 30))                      
+        return lr * (0.95 ** (epoch - 5))                      
 
 model = SimpleNet.build(224, 224, 3, classes=1, reg=l2(0.001))
 opt = Adam(learning_rate=lr, global_clipnorm = 1.0)
-model.compile(loss=focal_loss(), optimizer=opt, metrics=['accuracy', Recall(), AUC(), Precision()])
+auc = AUC(name='auc', curve='ROC', num_thresholds=200, multi_label=False)
+model.compile(loss=focal_loss(), optimizer=opt, metrics=['accuracy', Recall(), auc, Precision()])
 
 #callbacks =[LearningRateScheduler(poly_decay), early_stop]
-callbacks = [#ReduceLROnPlateau(monitor='val_loss', factor = 0.5, patience=3, min_lr = 1e-7), 
+callbacks = [# ReduceLROnPlateau(monitor='val_loss', factor = 0.5, patience=3, min_lr = 1e-7), 
+             BalancedMetrics(valGen),
              LearningRateScheduler(lr_schedule),
-             # EarlyStopping(monitor='val_auc', mode='max', patience=10, baseline=0.7, restore_best_weights=True),
-             CSVLogger('training.log'),
-             ModelCheckpoint('../model/best_model.h5', save_best_only=True, save_weights=False, monitor='val_auc', mode='max', verbose=1)]
+             EarlyStopping(monitor='val_balanced_acc', mode='max', patience=25, restore_best_weights=True),
+             ModelCheckpoint('../model/best_model.h5', save_best_only=True, save_weights=False, monitor='val_auc', mode='max', verbose=1),
+             CSVLogger('training.log')
+            ]
 
 original_df = pd.read_csv(train_csv)
 original_labels = original_df['Disease_Risk'].values
@@ -212,6 +237,7 @@ plt.plot(np.arange(0, N), H.history["loss"], label="train_loss")
 plt.plot(np.arange(0, N), H.history["val_loss"], label="val_loss")
 plt.plot(np.arange(0, N), H.history["accuracy"], label="train_acc")
 plt.plot(np.arange(0, N), H.history["val_accuracy"], label="val_acc")
+plt.plot(np.arange(0, N), H.history["val_balanced_acc"], label="val_balanced_acc", linestyle='--')
 plt.title("Training Loss and Accuracy on Dataset")
 plt.xlabel("Epoch #")
 plt.ylabel("Loss/Accuracy")
