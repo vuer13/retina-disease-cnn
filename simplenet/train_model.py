@@ -162,12 +162,12 @@ def focal_loss(gamma=2.0, alpha=0.5):
     return loss_fn
 
 def lr_schedule(epoch):
-    if epoch < 5:
-        return lr * (epoch + 1) / 5
-    elif 5 <= epoch < 20:
+    if epoch < 10:
+        return lr * (epoch + 1) / 10
+    elif 10 <= epoch < 25:
         return lr
     else:
-        return lr * (0.95 ** (epoch - 5))                      
+        return lr * (0.95 ** (epoch - 25))                      
 
 model = SimpleNet.build(224, 224, 3, classes=1, reg=l2(0.001))
 opt = Adam(learning_rate=lr, global_clipnorm = 1.0)
