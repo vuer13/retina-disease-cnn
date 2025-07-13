@@ -12,28 +12,29 @@ from tensorflow.keras.metrics import Recall, AUC, Precision
 from sklearn.utils.class_weight import compute_class_weight
 from tensorflow.keras.optimizers.schedules import CosineDecayRestarts
 from tensorflow.keras.optimizers.schedules import ExponentialDecay
+from tensorflow.keras.optimizers.schedules import CosineDecay
 from sklearn.metrics import classification_report
 from sklearn.metrics import confusion_matrix
 from sklearn.metrics import roc_auc_score, RocCurveDisplay
 from sklearn.metrics import f1_score
 from sklearn.metrics import recall_score
 from sklearn.metrics import balanced_accuracy_score
-from imutils import paths
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import tensorflow as tf
 import argparse
-
-from retina import RetinaGenerator
-from simplenet import SimpleNet
 import config
 import tqdm as tqdm
-
 from PIL import Image, ImageFilter, ImageOps
 import shutil
 import imagehash
 import os
+from imutils import paths
+
+from retina import RetinaGenerator
+from simplenet import SimpleNet
 
 ap = argparse.ArgumentParser()
 ap.add_argument("-p", "--plot", type=str, default="plot.png",
