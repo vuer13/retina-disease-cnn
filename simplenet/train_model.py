@@ -171,6 +171,14 @@ def lr_schedule(epoch):
         return lr
     else:
         return max(lr - (lr - min_lr) * ((epoch - 30) / 20), min_lr)
+    
+"""
+lr_schedule = CosineDecay(
+    initial_learning_rate=lr,
+    decay_steps=epoch*len(trainingGen),
+    alpha=0.1
+)
+"""
 
 model = SimpleNet.build(224, 224, 3, classes=1, reg=l2(0.001))
 opt = AdamW(learning_rate=lr, weight_decay=1e-5)
