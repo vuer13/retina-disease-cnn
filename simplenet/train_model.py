@@ -6,6 +6,7 @@ from tensorflow.keras.callbacks import LearningRateScheduler, ReduceLROnPlateau
 from tensorflow.keras.callbacks import EarlyStopping
 from tensorflow.keras.callbacks import CSVLogger, ModelCheckpoint
 from tensorflow.keras.optimizers import SGD, Adam
+from tensorflow_addons.optimizers import AdamW
 from tensorflow.keras.regularizers import l2
 from tensorflow.keras.metrics import Recall, AUC, Precision
 from sklearn.utils.class_weight import compute_class_weight
@@ -162,15 +163,17 @@ def focal_loss(gamma=2.0, alpha=0.5):
     return loss_fn
 
 def lr_schedule(epoch):
-    if epoch < 10:
-        return lr * (epoch + 1) / 10
-    elif 10 <= epoch < 25:
+    min_lr = lr * 0.01
+    if epoch < 15:
+        return lr * (epoch + 1) / 15
+    elif 15 <= epoch < 30:
         return lr
     else:
-        return lr * (0.95 ** (epoch - 25))                      
+        return max(lr - (lr - min_lr) * ((epoch - 30) / 20), min_lr)
 
 model = SimpleNet.build(224, 224, 3, classes=1, reg=l2(0.001))
-opt = Adam(learning_rate=lr, global_clipnorm = 1.0)
+opt = AdamW(learning_rate=lr, weight_decay=1e-5)
+# opt = Adam(learning_rate=lr, global_clipnorm = 0.5)
 auc = AUC(name='auc', curve='ROC', num_thresholds=200, multi_label=False)
 model.compile(loss=focal_loss(), optimizer=opt, metrics=['accuracy', Recall(), auc, Precision()])
 
@@ -178,8 +181,8 @@ model.compile(loss=focal_loss(), optimizer=opt, metrics=['accuracy', Recall(), a
 callbacks = [# ReduceLROnPlateau(monitor='val_loss', factor = 0.5, patience=3, min_lr = 1e-7), 
              BalancedMetrics(valGen),
              LearningRateScheduler(lr_schedule),
-             EarlyStopping(monitor='val_balanced_acc', mode='max', patience=25, restore_best_weights=True),
-             ModelCheckpoint('../model/best_model.h5', save_best_only=True, save_weights=False, monitor='val_auc', mode='max', verbose=1),
+             EarlyStopping(monitor='val_balanced_acc', mode='max', patience=15, restore_best_weights=True),
+             ModelCheckpoint('../model/best_model.h5', save_best_only=True, save_weights=False, monitor='val_balanced_acc', mode='max', verbose=1),
              CSVLogger('training.log')
             ]
 
