@@ -185,7 +185,7 @@ callbacks = [# ReduceLROnPlateau(monitor='val_loss', factor = 0.5, patience=3, m
              EarlyStopping(monitor='val_balanced_acc', mode='max', patience=15, restore_best_weights=True),
              ModelCheckpoint('../model/best_model.h5', save_best_only=True, save_weights=False, monitor='val_balanced_acc', mode='max', verbose=1),
              CSVLogger('training.log')
-            ]
+]
 
 original_df = pd.read_csv(train_csv)
 original_labels = original_df['Disease_Risk'].values

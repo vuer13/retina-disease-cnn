@@ -37,7 +37,7 @@ class SimpleNet:
         model.add(BatchNormalization())
         model.add(Activation("relu"))
         model.add(GaussianNoise(0.1))
-        # model.add(GlobalAveragePooling2D())
+        model.add(GlobalAveragePooling2D())
         
         """
         model.add(Conv2D(256, (3, 3), padding="same", kernel_regularizer=reg, kernel_initializer='he_uniform'))
@@ -49,9 +49,9 @@ class SimpleNet:
         
         # FC => RELU Layer
         # model.add(Flatten())
-        model.add(GlobalAveragePooling2D())
-        model.add(Dense(128, activation='relu', kernel_regularizer=reg))
-        model.add(Dropout(0.3))
+        # model.add(GlobalAveragePooling2D())
+        # model.add(Dense(128, activation='relu', kernel_regularizer=reg))
+        # model.add(Dropout(0.3))
   
         if classes == 1:
             model.add(Dense(classes, activation='sigmoid', kernel_regularizer=reg))
