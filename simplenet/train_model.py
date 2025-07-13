@@ -162,7 +162,7 @@ def focal_loss(gamma=2.0, alpha=0.5):
         return tf.reduce_mean(weight * cross_entropy)
     
     return loss_fn
-
+"""
 def lr_schedule(epoch):
     min_lr = lr * 0.01
     if epoch < 15:
@@ -178,10 +178,10 @@ lr_schedule = CosineDecay(
     decay_steps=epoch*len(trainingGen),
     alpha=0.1
 )
-"""
+
 
 model = SimpleNet.build(224, 224, 3, classes=1, reg=l2(0.001))
-opt = AdamW(learning_rate=lr, weight_decay=1e-5)
+opt = AdamW(learning_rate=lr_schedule, weight_decay=1e-5)
 # opt = Adam(learning_rate=lr, global_clipnorm = 0.5)
 auc = AUC(name='auc', curve='ROC', num_thresholds=200, multi_label=False)
 model.compile(loss=focal_loss(), optimizer=opt, metrics=['accuracy', Recall(), auc, Precision()])
@@ -189,7 +189,7 @@ model.compile(loss=focal_loss(), optimizer=opt, metrics=['accuracy', Recall(), a
 #callbacks =[LearningRateScheduler(poly_decay), early_stop]
 callbacks = [# ReduceLROnPlateau(monitor='val_loss', factor = 0.5, patience=3, min_lr = 1e-7), 
              BalancedMetrics(valGen),
-             LearningRateScheduler(lr_schedule),
+             # LearningRateScheduler(lr_schedule),
              EarlyStopping(monitor='val_balanced_acc', mode='max', patience=15, restore_best_weights=True),
              ModelCheckpoint('../model/best_model.h5', save_best_only=True, save_weights=False, monitor='val_balanced_acc', mode='max', verbose=1),
              CSVLogger('training.log')

@@ -36,7 +36,7 @@ class SimpleNet:
         model.add(Conv2D(256, (3, 3), padding="same", kernel_regularizer=reg, kernel_initializer='he_normal'))
         model.add(BatchNormalization())
         model.add(Activation("relu"))
-        model.add(GaussianNoise(0.1))
+        model.add(GaussianNoise(0.05))
         model.add(GlobalAveragePooling2D())
         
         """
