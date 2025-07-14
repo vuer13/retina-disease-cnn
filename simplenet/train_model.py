@@ -6,7 +6,7 @@ from tensorflow.keras.callbacks import LearningRateScheduler, ReduceLROnPlateau
 from tensorflow.keras.callbacks import EarlyStopping
 from tensorflow.keras.callbacks import CSVLogger, ModelCheckpoint
 from tensorflow.keras.optimizers import SGD, Adam
-from tensorflow_addons.optimizers import AdamW
+from tensorflow.keras.optimizers import AdamW
 from tensorflow.keras.regularizers import l2
 from tensorflow.keras.metrics import Recall, AUC, Precision
 from sklearn.utils.class_weight import compute_class_weight
@@ -216,7 +216,7 @@ H = model.fit(
     epochs=epoch,
     callbacks=callbacks,
     shuffle=False,
-    class_weights=class_weight_dict
+    class_weight=class_weight_dict
 )
 
 val_labels = []
