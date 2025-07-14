@@ -187,7 +187,7 @@ auc = AUC(name='auc', curve='ROC', num_thresholds=200, multi_label=False)
 model.compile(loss=focal_loss(), optimizer=opt, metrics=['accuracy', Recall(), auc, Precision()])
 
 #callbacks =[LearningRateScheduler(poly_decay), early_stop]
-callbacks = [ReduceLROnPlateau(monitor='val_loss', factor = 0.5, patience=5, min_lr = 1e-6, verbose=1), 
+callbacks = [# ReduceLROnPlateau(monitor='val_loss', factor = 0.5, patience=5, min_lr = 1e-6, verbose=1), 
              BalancedMetrics(valGen),
              # LearningRateScheduler(lr_schedule),
              EarlyStopping(monitor='val_balanced_acc', mode='max', patience=15, restore_best_weights=True),
