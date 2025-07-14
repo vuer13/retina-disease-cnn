@@ -187,7 +187,7 @@ auc = AUC(name='auc', curve='ROC', num_thresholds=200, multi_label=False)
 model.compile(loss=focal_loss(), optimizer=opt, metrics=['accuracy', Recall(), auc, Precision()])
 
 #callbacks =[LearningRateScheduler(poly_decay), early_stop]
-callbacks = [# ReduceLROnPlateau(monitor='val_loss', factor = 0.5, patience=3, min_lr = 1e-7), 
+callbacks = [ReduceLROnPlateau(monitor='val_loss', factor = 0.5, patience=5, min_lr = 1e-6, verbose=1), 
              BalancedMetrics(valGen),
              # LearningRateScheduler(lr_schedule),
              EarlyStopping(monitor='val_balanced_acc', mode='max', patience=15, restore_best_weights=True),
@@ -204,9 +204,9 @@ class_weights = compute_class_weight(
     classes=np.unique(original_labels),
     y=original_labels
 )
-#class_weight_dict = dict(zip(np.unique(original_labels), class_weights))
+class_weight_dict = dict(zip(np.unique(original_labels), class_weights))
 #class_weight_dict = {0: 4.0, 1: 0.5}
-#print(class_weight_dict)
+print(class_weight_dict)
 
 H = model.fit(
     x=trainingGen,
@@ -215,7 +215,8 @@ H = model.fit(
     validation_steps=len(valGen),
     epochs=epoch,
     callbacks=callbacks,
-    shuffle=False
+    shuffle=False,
+    class_weights=class_weight_dict
 )
 
 val_labels = []
