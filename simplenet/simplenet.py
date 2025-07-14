@@ -31,7 +31,7 @@ class SimpleNet:
         model.add(BatchNormalization())
         model.add(Activation('relu'))
         model.add(MaxPooling2D(pool_size=(2, 2)))
-        model.add(Dropout(0.4))
+        model.add(SpatialDropout2D(0.4))
         
         model.add(Conv2D(256, (3, 3), padding="same", kernel_regularizer=reg, kernel_initializer='he_normal'))
         model.add(BatchNormalization())

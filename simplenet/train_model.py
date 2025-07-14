@@ -42,7 +42,7 @@ ap.add_argument("-p", "--plot", type=str, default="plot.png",
 args = vars(ap.parse_args())
 
 epoch = 50
-lr = 1e-4
+lr = 1e-5
 batch_size = 64
 maxEpoch = epoch
 
