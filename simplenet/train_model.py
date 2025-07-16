@@ -42,7 +42,7 @@ ap.add_argument("-p", "--plot", type=str, default="plot.png",
 args = vars(ap.parse_args())
 
 epoch = 50
-lr = 7e-5
+lr = 8e-5
 batch_size = 64
 maxEpoch = epoch
 
@@ -153,7 +153,7 @@ class BalancedMetrics(tf.keras.callbacks.Callback):
         logs['val_balanced_acc'] = balanced_acc
         print(f"\nVal Balanced Acc: {balanced_acc:.4f}")
 
-def focal_loss(gamma=2.0, alpha=0.5):
+def focal_loss(gamma=2.0, alpha=0.45):
     def loss_fn(y_true, y_pred):
         y_pred = tf.clip_by_value(y_pred, 1e-7, 1 - 1e-7)
 
@@ -204,8 +204,8 @@ class_weights = compute_class_weight(
     classes=np.unique(original_labels),
     y=original_labels
 )
-class_weight_dict = dict(zip(np.unique(original_labels), class_weights))
-#class_weight_dict = {0: 4.0, 1: 0.5}
+#class_weight_dict = dict(zip(np.unique(original_labels), class_weights))
+class_weight_dict = {0: 1.5, 1: 1.0}
 print(class_weight_dict)
 
 H = model.fit(
@@ -229,7 +229,7 @@ for i in range(len(valGen)):
 val_labels = np.array(val_labels)
 val_preds = np.array(val_preds)
 
-thresholds = np.linspace(0.3, 0.7, 50) 
+thresholds = np.linspace(0.3, 0.8, 100) 
 best_thresh = max(thresholds, key=lambda t: f1_score(val_labels, val_preds > t, pos_label=1))
 print(f"Optimal Threshold: {best_thresh:.3f}")
 
