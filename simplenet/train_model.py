@@ -190,7 +190,7 @@ model.compile(loss=focal_loss(), optimizer=opt, metrics=['accuracy', Recall(), a
 callbacks = [# ReduceLROnPlateau(monitor='val_loss', factor = 0.5, patience=5, min_lr = 1e-6, verbose=1), 
              BalancedMetrics(valGen),
              # LearningRateScheduler(lr_schedule),
-             EarlyStopping(monitor='val_balanced_acc', mode='max', patience=15, restore_best_weights=True),
+             EarlyStopping(monitor='val_balanced_acc', mode='max', patience=20, restore_best_weights=True),
              ModelCheckpoint('../model/best_model.h5', save_best_only=True, save_weights=False, monitor='val_balanced_acc', mode='max', verbose=1),
              CSVLogger('training.log')
 ]
@@ -205,7 +205,7 @@ class_weights = compute_class_weight(
     y=original_labels
 )
 #class_weight_dict = dict(zip(np.unique(original_labels), class_weights))
-class_weight_dict = {0: 1.5, 1: 1.0}
+class_weight_dict = {0: 2.0, 1: 1.0}
 print(class_weight_dict)
 
 H = model.fit(
