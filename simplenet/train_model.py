@@ -18,6 +18,7 @@ from sklearn.metrics import confusion_matrix
 from sklearn.metrics import roc_auc_score, RocCurveDisplay
 from sklearn.metrics import f1_score
 from sklearn.metrics import recall_score
+from sklearn.metrics import roc_curve
 from sklearn.metrics import balanced_accuracy_score
 
 import matplotlib.pyplot as plt
@@ -229,8 +230,10 @@ for i in range(len(valGen)):
 val_labels = np.array(val_labels)
 val_preds = np.array(val_preds)
 
-thresholds = np.linspace(0.3, 0.8, 100) 
-best_thresh = max(thresholds, key=lambda t: f1_score(val_labels, val_preds > t, pos_label=1))
+# thresholds = np.linspace(0.35, 0.9, 100) 
+# best_thresh = max(thresholds, key=lambda t: f1_score(val_labels, val_preds > t, pos_label=1))
+fpr, tpr, thresholds = roc_curve(y_true, y_pred)
+best_thresh = thresholds[np.argmax(tpr - fpr)]
 print(f"Optimal Threshold: {best_thresh:.3f}")
 
 predId = model.predict(x=testGen, steps=(totalTest // batch_size) + 1)
