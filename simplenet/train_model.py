@@ -206,7 +206,7 @@ class_weights = compute_class_weight(
     y=original_labels
 )
 #class_weight_dict = dict(zip(np.unique(original_labels), class_weights))
-class_weight_dict = {0: 2.0, 1: 1.0}
+class_weight_dict = {0: 6.0, 1: 1.0}
 print(class_weight_dict)
 
 H = model.fit(
@@ -234,7 +234,7 @@ val_preds = np.array(val_preds)
 # best_thresh = max(thresholds, key=lambda t: f1_score(val_labels, val_preds > t, pos_label=1))
 fpr, tpr, thresholds = roc_curve(val_labels, val_preds)
 best_thresh = thresholds[np.argmax(tpr - fpr)]
-best_thresh = best_thresh * 0.9
+best_thresh = best_thresh * 0.88
 print(f"Optimal Threshold: {best_thresh:.3f}")
 
 predId = model.predict(x=testGen, steps=(totalTest // batch_size) + 1)
