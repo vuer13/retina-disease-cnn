@@ -1,7 +1,7 @@
 from tensorflow.keras.models import load_model
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from sklearn.metrics import classification_report, confusion_matrix, roc_curve
-from sklearn.metrics import recall_score, f1_score
+from sklearn.metrics import recall_score, f1_score, precision_score
 from retina import RetinaGenerator
 import numpy as np
 import pandas as pd
@@ -78,11 +78,10 @@ best_thresh = 0.5
 best_score = 0
 for t in thresholds:
     preds = (val_preds > t).astype("int32")
-    recall_1 = recall_score(val_labels, preds, pos_label=1)
-    recall_0 = recall_score(val_labels, preds, pos_label=0)
-    fn_rate = 1 - recall_1
+    pres_1 = precision_score(val_labels, preds, pos_label=1)
+    pres_0 = precision_score(val_labels, preds, pos_label=0)
 
-    if recall_1 >= 0.91 and recall_0 >= 0.7:
+    if recall_1 >= 0.915 and recall_0 >= 0.67:
         score = f1_score(val_labels, preds)
         if score > best_score:
             best_score = score
