@@ -1,6 +1,7 @@
 from tensorflow.keras.models import load_model
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from sklearn.metrics import classification_report, confusion_matrix, roc_curve
+from sklearn.metrics import recall_score, f1_score
 from retina import RetinaGenerator
 import numpy as np
 import pandas as pd
@@ -54,7 +55,7 @@ testGen = RetinaGenerator(
     shuffle = False
 ) 
 
-model = load_model("../model/retina_model.h5", custom_objects={"loss_fn": custom_loss})
+model = load_model("../final_model/retina_model_50_8.h5", custom_objects={"loss_fn": custom_loss})
 
 val_labels = []
 val_preds = []
@@ -66,11 +67,27 @@ for i in range(len(valGen)):
 val_labels = np.array(val_labels)
 val_preds = np.array(val_preds)
 
-# thresholds = np.linspace(0.35, 0.9, 100) 
 # best_thresh = max(thresholds, key=lambda t: f1_score(val_labels, val_preds > t, pos_label=1))
-fpr, tpr, thresholds = roc_curve(val_labels, val_preds)
-best_thresh = thresholds[np.argmax(tpr - fpr)]
-best_thresh = best_thresh * 0.9
+
+#fpr, tpr, thresholds = roc_curve(val_labels, val_preds)
+#best_thresh = thresholds[np.argmax(tpr - fpr)]
+#best_thresh = best_thresh * 0.8
+
+thresholds = np.linspace(0.1, 0.9, 100)
+best_thresh = 0.5
+best_score = 0
+for t in thresholds:
+    preds = (val_preds > t).astype("int32")
+    recall_1 = recall_score(val_labels, preds, pos_label=1)
+    recall_0 = recall_score(val_labels, preds, pos_label=0)
+    fn_rate = 1 - recall_1
+
+    if recall_1 >= 0.91 and recall_0 >= 0.7:
+        score = f1_score(val_labels, preds)
+        if score > best_score:
+            best_score = score
+            best_thresh = t
+            
 print(f"Optimal Threshold: {best_thresh:.3f}")
 
 predId = model.predict(x=testGen, steps=(totalTest // batch_size) + 1)
