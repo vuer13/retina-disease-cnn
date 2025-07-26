@@ -17,7 +17,7 @@ Optimal Threshold - 0.373
            0       0.66      0.71      0.68       134
            1       0.92      0.90      0.91       506
 
-    accuracy                           0.86       640 
+    accuracy                            0.86       640 
     macro avg       0.79      0.81      0.80       640
     weighted avg    0.87      0.86      0.86       640
 
@@ -33,7 +33,7 @@ Optimal Threshold - 0.431
            0       0.65      0.70      0.67       134
            1       0.92      0.90      0.91       506
 
-    accuracy                           0.86       640
+    accuracy                            0.86       640
     macro avg       0.78      0.80      0.79       640
     weighted avg    0.86      0.86      0.86       640
 
