@@ -2,11 +2,14 @@
 
 This project uses a Convolutional Neural Network (CNN) to classify retinal images as healthy (0) or diseased (1) using the RFMiD dataset. It includes focal loss for handling class imbalance and custom threshold tuning to reduce false negatives while maintaining strong performance.
 
+---
+
 ## Features
 - CNN-based binary classifier trained on the RFMiD retinal image dataset
 - Focal loss implementation to handle class imbalance
-- Custom RetinaGenerator to load image batches from CSV/image-directory
+- Custom RetinaGenerator to load image batches from CSV and image directories
 
+---
 
 Model 1: 
 Weights - Class 0: 1.5, Class 1: 1.0
@@ -41,9 +44,16 @@ Optimal Threshold - 0.431
 
 This model prioritizes reducing false negatives over false positives, as it is clinically safer to mistakenly flag a healthy retina for review than to miss a diseased retina and leave it undetected.
 
-Challenges:
+---
+
+## Challenges:
 - Class 0 (non-diseased) had significantly fewer samples than class 1 (diseased), so I applied resampling to balance the training set. As a result, the model may have reduced performance when classifying healthy retinas due to limited representative data
 
+---
+
 ## Future Plans
-- Create a front end for users to try classifying their retina
-- Transfer Learning to improve the model
+- Develop a frontend interface to allow users to upload and classify their own retinal images
+- Implement transfer learning to improve model performance and training efficiency
+- Reduce false negatives and improve recall for class 0 (healthy); this will require collecting more healthy retinal images for training
+- Extend the model to classify specific retinal diseases
+- Find a better dataset to classify diabetic retinopathy specifically
