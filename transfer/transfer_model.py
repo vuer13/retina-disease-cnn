@@ -4,10 +4,36 @@ import os
 parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.append(parent_dir)
 
+import matplotlib
+matplotlib.use('Agg')
+
+import numpy as np
+import matplotlib.pyplot as plt
 import pandas as pd
+import tensorflow as tf
+import argparse
+from PIL import Image, ImageFilter, ImageOps
+
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
+from tensorflow.keras.applications import EfficientNetB0
+from tensorflow.keras import layers, models
+from tensorflow.keras.layers import GlobalAveragePooling2D
+from tensorflow.keras.layers import Dropout
+from tensorflow.keras.layers import Dense
+from tensorflow.keras.optimizers import AdamW
+from tensorflow.keras.callbacks import CSVLogger, ModelCheckpoint
+from tensorflow.keras.callbacks import EarlyStopping
+from tensorflow.keras.metrics import AUC, Recall, Precision
+from tensorflow.keras.optimizers.schedules import CosineDecay
+from sklearn.metrics import classification_report, confusion_matrix, balanced_accuracy_score, roc_curve
 
 import config
+from retina import RetinaGenerator
+
+ap = argparse.ArgumentParser()
+ap.add_argument("-p", "--plot", type=str, default="plot.png",
+	help="path to output loss/accuracy plot")
+args = vars(ap.parse_args())
 
 batch_size = 64
 img_size = (224, 224)
@@ -55,3 +81,116 @@ testGen = RetinaGenerator(
     image_size = (224, 224),
     shuffle = False
 )
+
+base_model = EfficientNetB0(weights='imagenet', include_top=False, input_shape=(224, 224, 3))
+base_model.trainable = False
+
+new_model = models.Sequential([
+    base_model,
+    layers.GlobalAveragePooling2D(),
+    layers.Dropout(0.4),
+    layers.Dense(1, activation='sigmoid')
+])
+
+class BalancedMetrics(tf.keras.callbacks.Callback):
+    def __init__(self, validation_data):
+        super().__init__()
+        self.validation_data = validation_data
+        
+    def on_epoch_end(self, epoch, logs=None):
+        val_labels, val_preds = [], []
+        valGen.on_epoch_end()
+        for i in range(len(valGen)):
+            x, y = valGen[i]
+            val_labels.extend(y.flatten())
+            val_preds.extend(self.new_model.predict(x, verbose=0).flatten())
+            
+        val_labels = np.array(val_labels)
+        val_preds = np.array(val_preds)
+        
+        val_preds_class = (val_preds > 0.5).astype(int)
+        balanced_acc = balanced_accuracy_score(val_labels, val_preds_class)
+        
+        logs['val_balanced_acc'] = balanced_acc
+        print(f"\nVal Balanced Acc: {balanced_acc:.4f}")
+
+def focal_loss(gamma=2.0, alpha=0.5):
+    def loss_fn(y_true, y_pred):
+        y_pred = tf.clip_by_value(y_pred, 1e-7, 1 - 1e-7)
+
+        cross_entropy = -y_true * tf.math.log(y_pred) - (1 - y_true) * tf.math.log(1 - y_pred)
+        weight = alpha * tf.pow(1 - y_pred, gamma) * y_true + (1 - alpha) * tf.pow(y_pred, gamma) * (1 - y_true)
+        return tf.reduce_mean(weight * cross_entropy)
+    
+    return loss_fn
+
+lr_schedule = CosineDecay(
+    initial_learning_rate=lr,
+    decay_steps=epoch*len(trainingGen),
+    alpha=0.1
+)
+
+opt = AdamW(learning_rate=lr_schedule, weight_decay=1e-5)
+auc = AUC(name='auc', curve='ROC', num_thresholds=200, multi_label=False)
+new_model.compile(loss=focal_loss(), optimizer=opt, metrics=['accuracy', Recall(), auc, Precision()])
+callbacks = [BalancedMetrics(valGen),
+             EarlyStopping(monitor='val_balanced_acc', mode='max', patience=20, restore_best_weights=True),
+             ModelCheckpoint('../transfer_model/best_model.h5', save_best_only=True, save_weights=False, monitor='val_balanced_acc', mode='max', verbose=1),
+             CSVLogger('training.log')
+]
+
+original_df = pd.read_csv(train_csv)
+original_labels = original_df['Disease_Risk'].values
+
+class_weight_dict = {0: 2.0, 1: 1.0}
+print(class_weight_dict)
+
+H = new_model.fit(
+    x=train_gen,
+    steps_per_epoch=len(train_gen),
+    validation_data=val_gen,
+    validation_steps=len(val_gen),
+    epochs=30,
+    callbacks=callbacks,
+    shuffle=False,
+    class_weight=class_weight_dict
+)
+
+val_labels = []
+val_preds = []
+for i in range(len(valGen)):
+    x, y = valGen[i]
+    val_labels.extend(y.flatten())
+    val_preds.extend(new_model.predict(x, verbose=0).flatten())
+
+val_labels = np.array(val_labels)
+val_preds = np.array(val_preds)
+
+fpr, tpr, thresholds = roc_curve(val_labels, val_preds)
+best_thresh = thresholds[np.argmax(tpr - fpr)]
+best_thresh = best_thresh * 0.835
+print(f"Optimal Threshold: {best_thresh:.3f}")
+
+predId = new_model.predict(x=testGen, steps=(totalTest // batch_size) + 1)
+predId = (predId > best_thresh).astype("int32")
+
+test_df = pd.read_csv(config.DATASET_PATH_TEST + '/RFMiD_Testing_Labels_new.csv')
+y_true = test_df["Disease_Risk"].astype("int32").values
+
+print(classification_report(y_true[:len(predId)], predId))
+print(confusion_matrix(y_true[:len(predId)], predId))
+new_model.save("../transfer_model/retina_model.h5")
+
+N = len(H.history["loss"])
+plt.style.use("ggplot")
+plt.figure()
+plt.plot(np.arange(0, N), H.history["loss"], label="train_loss")
+plt.plot(np.arange(0, N), H.history["val_loss"], label="val_loss")
+plt.plot(np.arange(0, N), H.history["accuracy"], label="train_acc")
+plt.plot(np.arange(0, N), H.history["val_accuracy"], label="val_acc", linestyle='--')
+plt.plot(np.arange(0, N), H.history["val_balanced_acc"], label="val_balanced_acc")
+plt.title("Training Loss and Accuracy on Dataset")
+plt.xlabel("Epoch #")
+plt.ylabel("Loss/Accuracy")
+plt.legend(loc="lower left")
+plt.savefig(args["plot"])
