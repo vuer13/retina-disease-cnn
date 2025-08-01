@@ -46,9 +46,13 @@ class RetinaGenerator(Sequence):
         
         for _, row in df.iterrows():
             img_path = os.path.join(self.img_dir, str(row["ID"]) + '.png')
-            image = load_img(img_path, target_size = self.image_size)
-            image = img_to_array(image)
             
+            #image = load_img(img_path, target_size = self.image_size)
+            #image = img_to_array(image)
+            
+            # FOR TRANSFER LEARNING
+            image = load_img(img_path, target_size=self.image_size, color_mode='rgb')
+            image = img_to_array(image)
             image = (image / 127.5) - 1.0 
             
             if self.augmenter:

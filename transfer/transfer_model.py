@@ -1,8 +1,7 @@
 import sys
 import os
 
-parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-sys.path.append(parent_dir)
+sys.path.append(os.path.abspath('../simplenet'))
 
 import matplotlib
 matplotlib.use('Agg')
@@ -18,6 +17,11 @@ from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from tensorflow.keras.applications import EfficientNetB0
 from tensorflow.keras import layers, models
 from tensorflow.keras.layers import GlobalAveragePooling2D
+from tensorflow.keras.layers import GaussianNoise
+from tensorflow.keras.layers import BatchNormalization
+from tensorflow.keras.layers import Activation
+from tensorflow.keras.layers import MaxPooling2D
+from tensorflow.keras.layers import Conv2D
 from tensorflow.keras.layers import Dropout
 from tensorflow.keras.layers import Dense
 from tensorflow.keras.optimizers import AdamW
@@ -37,6 +41,8 @@ args = vars(ap.parse_args())
 
 batch_size = 64
 img_size = (224, 224)
+lr = 1e-4
+epoch = 30
 
 totalTrain = len(pd.read_csv(config.DATASET_PATH_TRAIN + '/RFMiD_Training_Labels.csv'))
 totalVal = len(pd.read_csv(config.DATASET_PATH_VAL + '/RFMiD_Validation_Labels.csv'))
@@ -49,6 +55,23 @@ test_csv = os.path.join(config.DATASET_PATH_TEST, 'RFMiD_Testing_Labels_new.csv'
 train_dir = os.path.join(config.DATASET_PATH_TRAIN, 'Training')
 val_dir = os.path.join(config.DATASET_PATH_VAL, 'Validation')
 test_dir = os.path.join(config.DATASET_PATH_TEST, 'Test')
+
+trainAug = ImageDataGenerator(
+	rotation_range=15,
+    zoom_range=0.1,
+    width_shift_range=0.1,
+    height_shift_range=0.1,
+    shear_range=0.1, 
+    horizontal_flip=True,
+    vertical_flip=True,
+    brightness_range=[0.9, 1.1],
+    fill_mode="constant"
+)
+
+valAug = ImageDataGenerator()
+
+testAug = ImageDataGenerator()
+
 
 trainingGen = RetinaGenerator(
     csv_path = train_csv,
@@ -83,10 +106,23 @@ testGen = RetinaGenerator(
 )
 
 base_model = EfficientNetB0(weights='imagenet', include_top=False, input_shape=(224, 224, 3))
-base_model.trainable = False
+base_model.trainable = True
+for layer in base_model.layers[:-20]:
+    layer.trainable = False
 
 new_model = models.Sequential([
     base_model,
+    
+    layers.Conv2D(64, (5, 5), padding='same'),
+    layers.BatchNormalization(),
+    layers.Activation('relu'),
+    layers.MaxPooling2D(pool_size=(2, 2)),
+    layers.Dropout(0.3),
+    
+    layers.Conv2D(128, (3, 3), padding="same"),
+    layers.BatchNormalization(),
+    layers.Activation('relu'),
+    
     layers.GlobalAveragePooling2D(),
     layers.Dropout(0.4),
     layers.Dense(1, activation='sigmoid')
@@ -103,7 +139,7 @@ class BalancedMetrics(tf.keras.callbacks.Callback):
         for i in range(len(valGen)):
             x, y = valGen[i]
             val_labels.extend(y.flatten())
-            val_preds.extend(self.new_model.predict(x, verbose=0).flatten())
+            val_preds.extend(self.model.predict(x, verbose=0).flatten())
             
         val_labels = np.array(val_labels)
         val_preds = np.array(val_preds)
@@ -135,21 +171,21 @@ auc = AUC(name='auc', curve='ROC', num_thresholds=200, multi_label=False)
 new_model.compile(loss=focal_loss(), optimizer=opt, metrics=['accuracy', Recall(), auc, Precision()])
 callbacks = [BalancedMetrics(valGen),
              EarlyStopping(monitor='val_balanced_acc', mode='max', patience=20, restore_best_weights=True),
-             ModelCheckpoint('../transfer_model/best_model.h5', save_best_only=True, save_weights=False, monitor='val_balanced_acc', mode='max', verbose=1),
+             ModelCheckpoint('../transfer_model/best_model.h5', save_best_only=True, monitor='val_balanced_acc', mode='max', verbose=1),
              CSVLogger('training.log')
 ]
 
 original_df = pd.read_csv(train_csv)
 original_labels = original_df['Disease_Risk'].values
 
-class_weight_dict = {0: 2.0, 1: 1.0}
+class_weight_dict = {0: 5.0, 1: 1.0}
 print(class_weight_dict)
 
 H = new_model.fit(
-    x=train_gen,
-    steps_per_epoch=len(train_gen),
-    validation_data=val_gen,
-    validation_steps=len(val_gen),
+    x=trainingGen,
+    steps_per_epoch=len(trainingGen),
+    validation_data=valGen,
+    validation_steps=len(valGen),
     epochs=30,
     callbacks=callbacks,
     shuffle=False,
