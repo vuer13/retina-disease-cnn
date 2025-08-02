@@ -9,6 +9,7 @@ matplotlib.use('Agg')
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
+import numpy as np
 import tensorflow as tf
 import argparse
 from PIL import Image, ImageFilter, ImageOps
@@ -29,6 +30,7 @@ from tensorflow.keras.callbacks import CSVLogger, ModelCheckpoint
 from tensorflow.keras.callbacks import EarlyStopping
 from tensorflow.keras.metrics import AUC, Recall, Precision
 from tensorflow.keras.optimizers.schedules import CosineDecay
+from tensorflow.keras.applications.efficientnet import preprocess_input
 from sklearn.metrics import classification_report, confusion_matrix, balanced_accuracy_score, roc_curve
 
 import config
@@ -42,7 +44,7 @@ args = vars(ap.parse_args())
 batch_size = 64
 img_size = (224, 224)
 lr = 1e-4
-epoch = 30
+epoch = 50
 
 totalTrain = len(pd.read_csv(config.DATASET_PATH_TRAIN + '/RFMiD_Training_Labels.csv'))
 totalVal = len(pd.read_csv(config.DATASET_PATH_VAL + '/RFMiD_Validation_Labels.csv'))
@@ -57,20 +59,17 @@ val_dir = os.path.join(config.DATASET_PATH_VAL, 'Validation')
 test_dir = os.path.join(config.DATASET_PATH_TEST, 'Test')
 
 trainAug = ImageDataGenerator(
-	rotation_range=15,
+    preprocessing_function=preprocess_input,
+	rotation_range=10,
     zoom_range=0.1,
     width_shift_range=0.1,
     height_shift_range=0.1,
-    shear_range=0.1, 
-    horizontal_flip=True,
-    vertical_flip=True,
-    brightness_range=[0.9, 1.1],
-    fill_mode="constant"
+    horizontal_flip=True
 )
 
-valAug = ImageDataGenerator()
+valAug = ImageDataGenerator(preprocessing_function=preprocess_input)
 
-testAug = ImageDataGenerator()
+testAug = ImageDataGenerator(preprocessing_function=preprocess_input)
 
 
 trainingGen = RetinaGenerator(
@@ -105,9 +104,15 @@ testGen = RetinaGenerator(
     shuffle = False
 )
 
+train_counts = np.unique(next(iter(trainingGen))[1], return_counts=True)
+val_counts = np.unique(next(iter(valGen))[1], return_counts=True)
+
+print(f"Train class distribution: {train_counts}")
+print(f"Val class distribution: {val_counts}")
+
 base_model = EfficientNetB0(weights='imagenet', include_top=False, input_shape=(224, 224, 3))
 base_model.trainable = True
-for layer in base_model.layers[:-20]:
+for layer in base_model.layers[:10]:
     layer.trainable = False
 
 new_model = models.Sequential([
@@ -178,7 +183,7 @@ callbacks = [BalancedMetrics(valGen),
 original_df = pd.read_csv(train_csv)
 original_labels = original_df['Disease_Risk'].values
 
-class_weight_dict = {0: 5.0, 1: 1.0}
+class_weight_dict = {0: 2.0, 1: 1.0}
 print(class_weight_dict)
 
 H = new_model.fit(
@@ -204,7 +209,7 @@ val_preds = np.array(val_preds)
 
 fpr, tpr, thresholds = roc_curve(val_labels, val_preds)
 best_thresh = thresholds[np.argmax(tpr - fpr)]
-best_thresh = best_thresh * 0.835
+best_thresh = best_thresh
 print(f"Optimal Threshold: {best_thresh:.3f}")
 
 predId = new_model.predict(x=testGen, steps=(totalTest // batch_size) + 1)
