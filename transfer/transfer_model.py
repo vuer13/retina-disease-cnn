@@ -43,7 +43,7 @@ args = vars(ap.parse_args())
 
 batch_size = 64
 img_size = (224, 224)
-lr = 1e-4
+lr = 1e-5 
 epoch = 50
 
 totalTrain = len(pd.read_csv(config.DATASET_PATH_TRAIN + '/RFMiD_Training_Labels.csv'))
@@ -112,7 +112,7 @@ print(f"Val class distribution: {val_counts}")
 
 base_model = EfficientNetB0(weights='imagenet', include_top=False, input_shape=(224, 224, 3))
 base_model.trainable = True
-for layer in base_model.layers[:10]:
+for layer in base_model.layers[:15]:
     layer.trainable = False
 
 new_model = models.Sequential([
@@ -122,14 +122,14 @@ new_model = models.Sequential([
     layers.BatchNormalization(),
     layers.Activation('relu'),
     layers.MaxPooling2D(pool_size=(2, 2)),
-    layers.Dropout(0.3),
+    layers.Dropout(0.4),
     
     layers.Conv2D(128, (3, 3), padding="same"),
     layers.BatchNormalization(),
     layers.Activation('relu'),
     
     layers.GlobalAveragePooling2D(),
-    layers.Dropout(0.4),
+    layers.Dropout(0.5),
     layers.Dense(1, activation='sigmoid')
 ])
 
@@ -183,7 +183,7 @@ callbacks = [BalancedMetrics(valGen),
 original_df = pd.read_csv(train_csv)
 original_labels = original_df['Disease_Risk'].values
 
-class_weight_dict = {0: 2.0, 1: 1.0}
+class_weight_dict = {0: 1.0, 1: 1.0}
 print(class_weight_dict)
 
 H = new_model.fit(
@@ -191,7 +191,7 @@ H = new_model.fit(
     steps_per_epoch=len(trainingGen),
     validation_data=valGen,
     validation_steps=len(valGen),
-    epochs=30,
+    epochs=epoch,
     callbacks=callbacks,
     shuffle=False,
     class_weight=class_weight_dict
