@@ -73,7 +73,7 @@ val_preds = np.array(val_preds)
 
 fpr, tpr, thresholds = roc_curve(val_labels, val_preds)
 best_thresh = thresholds[np.argmax(tpr - fpr)]
-best_thresh = best_thresh * 0.8
+best_thresh = best_thresh * 0.82
 print(f"Optimal Threshold: {best_thresh:.3f}")
 
 predId = model.predict(x=testGen, steps=(totalTest // batch_size) + 1)

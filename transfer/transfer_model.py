@@ -30,6 +30,7 @@ from tensorflow.keras.callbacks import CSVLogger, ModelCheckpoint
 from tensorflow.keras.callbacks import EarlyStopping
 from tensorflow.keras.metrics import AUC, Recall, Precision
 from tensorflow.keras.optimizers.schedules import CosineDecay
+from tensorflow.keras.regularizers import l2
 from tensorflow.keras.applications.efficientnet import preprocess_input
 from sklearn.metrics import classification_report, confusion_matrix, balanced_accuracy_score, roc_curve
 
@@ -60,12 +61,13 @@ test_dir = os.path.join(config.DATASET_PATH_TEST, 'Test')
 
 trainAug = ImageDataGenerator(
     preprocessing_function=preprocess_input,
-	rotation_range=20,
-    zoom_range=0.2,
+	rotation_range=25,
+    zoom_range=0.25,
     width_shift_range=0.2,
     height_shift_range=0.2,
     shear_range=0.2,
-    horizontal_flip=True
+    horizontal_flip=True,
+    fill_mode="nearest"
 )
 
 valAug = ImageDataGenerator(preprocessing_function=preprocess_input)
@@ -120,7 +122,7 @@ new_model = models.Sequential([
     base_model,
     layers.GlobalAveragePooling2D(),
     layers.Dropout(0.5),
-    layers.Dense(1, activation='sigmoid')
+    layers.Dense(1, activation='sigmoid', kernel_regularizer=l2(0.001))
 ])
 
 class BalancedMetrics(tf.keras.callbacks.Callback):
@@ -157,7 +159,7 @@ def focal_loss(gamma=2.0, alpha=0.5):
 
 lr_schedule = CosineDecay(
     initial_learning_rate=lr,
-    decay_steps=epoch*len(trainingGen),
+    decay_steps=30*len(trainingGen),
     alpha=0.1
 )
 
@@ -181,7 +183,28 @@ H = new_model.fit(
     steps_per_epoch=len(trainingGen),
     validation_data=valGen,
     validation_steps=len(valGen),
-    epochs=epoch,
+    epochs=30,
+    callbacks=callbacks,
+    shuffle=False,
+    class_weight=class_weight_dict
+)
+
+# Second training
+for layer in base_model.layers[:100]:
+    layer.trainable = True
+    
+new_model.compile(
+    optimizer=Adam(learning_rate=5e-6),
+    loss=focal_loss(),
+    metrics=['accuracy', Recall(), auc, Precision()]
+)
+
+H2 = new_model.fit(
+    x=trainingGen,
+    steps_per_epoch=len(trainingGen),
+    validation_data=valGen,
+    validation_steps=len(valGen),
+    epochs=20,
     callbacks=callbacks,
     shuffle=False,
     class_weight=class_weight_dict
@@ -212,6 +235,9 @@ print(classification_report(y_true[:len(predId)], predId))
 print(confusion_matrix(y_true[:len(predId)], predId))
 new_model.save("../transfer_model/retina_model.h5")
 
+for key in H2.history:
+    H.history[key] += H2.history[key]
+    
 N = len(H.history["loss"])
 plt.style.use("ggplot")
 plt.figure()
