@@ -60,10 +60,11 @@ test_dir = os.path.join(config.DATASET_PATH_TEST, 'Test')
 
 trainAug = ImageDataGenerator(
     preprocessing_function=preprocess_input,
-	rotation_range=10,
-    zoom_range=0.1,
-    width_shift_range=0.1,
-    height_shift_range=0.1,
+	rotation_range=20,
+    zoom_range=0.2,
+    width_shift_range=0.2,
+    height_shift_range=0.2,
+    shear_range=0.2,
     horizontal_flip=True
 )
 
@@ -112,22 +113,11 @@ print(f"Val class distribution: {val_counts}")
 
 base_model = EfficientNetB0(weights='imagenet', include_top=False, input_shape=(224, 224, 3))
 base_model.trainable = True
-for layer in base_model.layers[:15]:
+for layer in base_model.layers[:200]:
     layer.trainable = False
 
 new_model = models.Sequential([
     base_model,
-    
-    layers.Conv2D(64, (5, 5), padding='same'),
-    layers.BatchNormalization(),
-    layers.Activation('relu'),
-    layers.MaxPooling2D(pool_size=(2, 2)),
-    layers.Dropout(0.4),
-    
-    layers.Conv2D(128, (3, 3), padding="same"),
-    layers.BatchNormalization(),
-    layers.Activation('relu'),
-    
     layers.GlobalAveragePooling2D(),
     layers.Dropout(0.5),
     layers.Dense(1, activation='sigmoid')
@@ -234,4 +224,4 @@ plt.title("Training Loss and Accuracy on Dataset")
 plt.xlabel("Epoch #")
 plt.ylabel("Loss/Accuracy")
 plt.legend(loc="lower left")
-plt.savefig(args["plot"])
+plt.savefig(args["plot"]) 

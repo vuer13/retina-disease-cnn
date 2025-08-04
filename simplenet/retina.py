@@ -53,7 +53,6 @@ class RetinaGenerator(Sequence):
             # FOR TRANSFER LEARNING
             image = load_img(img_path, target_size=self.image_size, color_mode='rgb')
             image = img_to_array(image)
-            image = (image / 127.5) - 1.0 
             
             if self.augmenter:
                 image = self.augmenter.random_transform(image)
