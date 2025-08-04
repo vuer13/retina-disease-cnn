@@ -2,6 +2,7 @@ from tensorflow.keras.models import load_model
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from sklearn.metrics import classification_report, confusion_matrix, roc_curve
 from sklearn.metrics import recall_score, f1_score, precision_score
+from tensorflow.keras.applications.efficientnet import preprocess_input
 from retina import RetinaGenerator
 import numpy as np
 import pandas as pd
@@ -10,7 +11,7 @@ import os
 
 batch_size = 64
 
-def focal_loss(gamma=2.0, alpha=0.45):
+def focal_loss(gamma=2.0, alpha=0.5):
     def loss_fn(y_true, y_pred):
         y_pred = tf.clip_by_value(y_pred, 1e-7, 1 - 1e-7)
 
@@ -20,7 +21,7 @@ def focal_loss(gamma=2.0, alpha=0.45):
     
     return loss_fn
 
-custom_loss = focal_loss(gamma=2.0, alpha=0.45)
+custom_loss = focal_loss(gamma=2.0, alpha=0.5)
 
 totalVal = len(pd.read_csv(config.DATASET_PATH_VAL + '/RFMiD_Validation_Labels.csv'))
 totalTest = len(pd.read_csv(config.DATASET_PATH_TEST + '/RFMiD_Testing_Labels.csv'))
@@ -31,8 +32,8 @@ test_csv = os.path.join(config.DATASET_PATH_TEST, 'RFMiD_Testing_Labels_new.csv'
 val_dir = os.path.join(config.DATASET_PATH_VAL, 'Validation')
 test_dir = os.path.join(config.DATASET_PATH_TEST, 'Test')
 
-valAug = ImageDataGenerator()
-testAug = ImageDataGenerator()
+valAug = ImageDataGenerator(preprocessing_function=preprocess_input)
+testAug = ImageDataGenerator(preprocessing_function=preprocess_input)
 
 valGen = RetinaGenerator(
     csv_path = val_csv,
@@ -55,7 +56,7 @@ testGen = RetinaGenerator(
     shuffle = False
 ) 
 
-model = load_model("../final_model/retina_model_50_3.h5", custom_objects={"loss_fn": custom_loss})
+model = load_model("../transfer_model/retina_model.h5", custom_objects={"loss_fn": custom_loss})
 
 val_labels = []
 val_preds = []
@@ -71,7 +72,7 @@ val_preds = np.array(val_preds)
 
 fpr, tpr, thresholds = roc_curve(val_labels, val_preds)
 best_thresh = thresholds[np.argmax(tpr - fpr)]
-best_thresh = best_thresh * 0.8
+best_thresh = best_thresh * 0.9
 
 """
 thresholds = np.linspace(0.1, 0.9, 100)
@@ -94,7 +95,7 @@ for t in thresholds:
 print(f"Optimal Threshold: {best_thresh:.3f}")
 
 predId = model.predict(x=testGen, steps=(totalTest // batch_size) + 1)
-predId = (predId > best_thresh).astype("int32")
+predId = (predId > (0.471 * 0.9)).astype("int32")
 
 test_df = pd.read_csv(config.DATASET_PATH_TEST + '/RFMiD_Testing_Labels_new.csv')
 y_true = test_df["Disease_Risk"].astype("int32").values
