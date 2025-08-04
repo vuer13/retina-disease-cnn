@@ -59,7 +59,7 @@ testGen = RetinaGenerator(
     shuffle = False
 )
 
-model = load_model("../transfer_model/retina_model_50_1.h5", custom_objects={"loss_fn": focal_loss()})
+model = load_model("../transfer_model/retina_model.h5", custom_objects={"loss_fn": focal_loss()})
 
 val_labels = []
 val_preds = []
@@ -71,13 +71,9 @@ for i in range(len(valGen)):
 val_labels = np.array(val_labels)
 val_preds = np.array(val_preds)
 
-print("Min prediction:", np.min(val_preds))
-print("Max prediction:", np.max(val_preds))
-print("Mean prediction:", np.mean(val_preds))
-
 fpr, tpr, thresholds = roc_curve(val_labels, val_preds)
 best_thresh = thresholds[np.argmax(tpr - fpr)]
-best_thresh = best_thresh * 0.9
+best_thresh = best_thresh * 0.8
 print(f"Optimal Threshold: {best_thresh:.3f}")
 
 predId = model.predict(x=testGen, steps=(totalTest // batch_size) + 1)
