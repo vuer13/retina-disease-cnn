@@ -159,7 +159,7 @@ def focal_loss(gamma=2.0, alpha=0.5):
 
 lr_schedule = CosineDecay(
     initial_learning_rate=lr,
-    decay_steps=30*len(trainingGen),
+    decay_steps=50*len(trainingGen),
     alpha=0.1
 )
 
@@ -175,7 +175,7 @@ callbacks = [BalancedMetrics(valGen),
 original_df = pd.read_csv(train_csv)
 original_labels = original_df['Disease_Risk'].values
 
-class_weight_dict = {0: 1.0, 1: 1.0}
+class_weight_dict = {0: 1.0, 1: 4.0}
 print(class_weight_dict)
 
 H = new_model.fit(
@@ -183,28 +183,7 @@ H = new_model.fit(
     steps_per_epoch=len(trainingGen),
     validation_data=valGen,
     validation_steps=len(valGen),
-    epochs=30,
-    callbacks=callbacks,
-    shuffle=False,
-    class_weight=class_weight_dict
-)
-
-# Second training
-for layer in base_model.layers[:100]:
-    layer.trainable = True
-    
-new_model.compile(
-    optimizer=Adam(learning_rate=5e-6),
-    loss=focal_loss(),
-    metrics=['accuracy', Recall(), auc, Precision()]
-)
-
-H2 = new_model.fit(
-    x=trainingGen,
-    steps_per_epoch=len(trainingGen),
-    validation_data=valGen,
-    validation_steps=len(valGen),
-    epochs=20,
+    epochs=50,
     callbacks=callbacks,
     shuffle=False,
     class_weight=class_weight_dict
@@ -234,9 +213,6 @@ y_true = test_df["Disease_Risk"].astype("int32").values
 print(classification_report(y_true[:len(predId)], predId))
 print(confusion_matrix(y_true[:len(predId)], predId))
 new_model.save("../transfer_model/retina_model.h5")
-
-for key in H2.history:
-    H.history[key] += H2.history[key]
     
 N = len(H.history["loss"])
 plt.style.use("ggplot")
