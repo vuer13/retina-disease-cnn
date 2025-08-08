@@ -9,11 +9,13 @@ This project uses a Convolutional Neural Network (CNN) to classify retinal image
 - Focal loss implementation to handle class imbalance
 - Custom RetinaGenerator to load image batches from CSV and image directories
 
-DATASET SOURCE: https://www.kaggle.com/datasets/andrewmvd/retinal-disease-classification
+Dataset Source: https://www.kaggle.com/datasets/andrewmvd/retinal-disease-classification
 ---
 
 Model 1: 
+
 Weights - Class 0: 1.5, Class 1: 1.0
+
 Optimal Threshold - 0.373
 
                 precision    recall  f1-score   support
@@ -29,7 +31,9 @@ Optimal Threshold - 0.373
 
 
 Model 2:
+
 Weights - Class 0: 5.0, Class 1: 1.0
+
 Optimal Threshold - 0.431
 
                 precision    recall  f1-score   support
@@ -55,7 +59,9 @@ This model prioritizes reducing false negatives over false positives, as it is c
 ## Transfer Learning Results
 
 Model:
+
 Weights - Class 0: 1.0, Class 1: 4.0
+
 Optimal Threshold - 0.284
 
                 precision    recall  f1-score   support
