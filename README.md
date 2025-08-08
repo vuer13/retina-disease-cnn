@@ -9,6 +9,7 @@ This project uses a Convolutional Neural Network (CNN) to classify retinal image
 - Focal loss implementation to handle class imbalance
 - Custom RetinaGenerator to load image batches from CSV and image directories
 
+DATASET SOURCE: https://www.kaggle.com/datasets/andrewmvd/retinal-disease-classification
 ---
 
 Model 1: 
@@ -51,9 +52,27 @@ This model prioritizes reducing false negatives over false positives, as it is c
 
 ---
 
+## Transfer Learning Results
+
+Model:
+Weights - Class 0: 1.0, Class 1: 4.0
+Optimal Threshold - 0.284
+
+                precision    recall  f1-score   support
+
+            0       0.69      0.88      0.77       134
+            1       0.97      0.90      0.93       506
+
+    accuracy                            0.89       640
+    macro avg       0.83      0.89      0.85       640
+    weighted avg    0.91      0.89      0.90       640
+
+12% FP, 10% FN
+
+Results surpassed the SimpleNet model by leveraging transfer learning with EfficientNetB0. While even better performance may be achievable using larger EfficientNet variants, resource limitations prevented training those models at this time.
+
 ## Future Plans
 - Develop a frontend interface to allow users to upload and classify their own retinal images
-- Implement transfer learning to improve model performance and training efficiency
 - Reduce false negatives and improve recall for class 0 (healthy); this will require collecting more healthy retinal images for training
 - Extend the model to classify specific retinal diseases
-- Find a better dataset to classify diabetic retinopathy specifically
+- Find a better dataset to classify diabetic retinopathy specifically (if possible)
